@@ -1,0 +1,6 @@
+{
+  "name": "TA TRACKER",
+  "description": "Hệ thống quản lý và theo dõi dữ liệu ứng viên tuyển dụng đa người dùng (PIC & Admin) với kiểm soát phiên bản, phân quyền, báo cáo phễu và nhật ký thay đổi.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
