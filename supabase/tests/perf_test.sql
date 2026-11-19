@@ -1,7 +1,7 @@
 -- M2-7: đo thời gian truy vấn (EXPLAIN ANALYZE, gồm planning) trên 20.000 hồ sơ, dưới quyền Admin và TA (có RLS).
 -- Mỗi truy vấn: 1 lần làm nóng + 5 lần đo. Ngưỡng: lần chậm nhất < 200 ms (IMPLEMENTATION_TASKS M2-7).
--- Variant A = policy hiện hành (migrations). Variant B = rr_read viết lại cho planner dùng được index (chỉ đo để so sánh,
--- ROLLBACK). Chỉ A bị kiểm ngưỡng. Chạy sau perf_seed.sql.
+-- Variant A = policy hiện hành (migrations, từ 0008 đã là dạng tối ưu). Variant B = áp lại dạng tối ưu (ROLLBACK) –
+-- giữ để phát hiện nếu migration sau làm policy chậm lại (A lệch xa B). Chỉ A bị kiểm ngưỡng. Chạy sau perf_seed.sql.
 \set ON_ERROR_STOP 1
 begin;
 
