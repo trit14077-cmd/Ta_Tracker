@@ -46,6 +46,7 @@ begin
       ('R7 report_reasons YTD',           'admin', 'select public.report_reasons(''2026-01-01'', ''2026-11-19'', ''{}'')'),
       ('R8 report_meta',                  'admin', 'select public.report_meta(''2026-11-19'')'),
       -- M5-4: Kanban
+      ('B0 board_counts (thẻ KPI)',      'admin', 'select public.board_counts('''')'),
       ('B1 board_page',                   'admin', 'select public.board_page(''{}'', '''')'),
       ('B2 board_page',                   'ta',    'select public.board_page(''{}'', '''')'),
       ('B3 board_page tìm tên',           'admin', 'select public.board_page(''{}'', ''văn'')'),

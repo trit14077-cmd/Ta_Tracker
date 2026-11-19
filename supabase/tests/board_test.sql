@@ -48,6 +48,15 @@ begin
   assert (select bool_and((pg -> 'counts' -> k ->> 'total') = (public.board_counts('') -> 'counts' -> k ->> 'total')))
           from unnest(array['lead','r1','lusu','r2','ob']) k, 'board_page khớp board_counts'; c := c + 1;
 
+  -- board_counts.subs = boardSub() trên golden (0014 viết lại board_counts cho nhanh, kết quả phải giữ nguyên)
+  select string_agg(format('%s: %s/%s', s, public.board_counts('') -> 'subs' ->> s,
+                           (select count(*) from jsonb_array_elements(fx -> 'outputs' -> 'perRecord') p where p ->> 'sub' = s)), '; ')
+    into bad
+    from unnest(array['lead_new','r1_wait','su','lu','r2_passed','r2_failed','r2_canceled','ob_wait']) s
+   where (public.board_counts('') -> 'subs' ->> s)::int
+         <> (select count(*) from jsonb_array_elements(fx -> 'outputs' -> 'perRecord') p where p ->> 'sub' = s);
+  assert bad is null, 'board_counts.subs lệch boardSub: ' || coalesce(bad, ''); c := c + 1;
+
   -- ---------- 2. failed_at của thẻ = boardPosition().failedAt ----------
   select string_agg(format('%s: %s/%s', card ->> 'candidate_code', card ->> 'failed_at', coalesce(p -> 'board' ->> 'failedAt', '')), '; ')
     into bad
