@@ -1,7 +1,9 @@
 -- M4-3: đối chiếu hàm SQL (0010) với logic của hệ cũ trên golden fixture (tests/golden/fixture.json, sinh từ shared/).
 --   rr_board_col  = boardPosition().col     rr_board_sub = boardSub()     rr_tenor = computeTenor()
--- Chạy:  psql -v ON_ERROR_STOP=1 -v fx="$(cat tests/golden/fixture.json)" -f supabase/tests/sql_parity_test.sql
+-- Chạy từ thư mục gốc repo:  psql -v ON_ERROR_STOP=1 -f supabase/tests/sql_parity_test.sql
+-- Fixture (~270 KB) được psql tự đọc bằng \set + backtick (không truyền qua dòng lệnh: Linux giới hạn 128 KB/tham số).
 -- Chỉ đọc (không ghi bảng).
+\set fx `cat tests/golden/fixture.json`
 select set_config('parity.fx', :'fx', false);
 do $$
 declare
