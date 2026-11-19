@@ -142,6 +142,13 @@ begin
     assert false, 'kỳ from > to phải bị từ chối';
   exception when invalid_parameter_value then c := c + 1;
   end;
+  -- 0012 report_counts: all = số hồ sơ golden (hồ sơ lưu trữ không tính); filtered theo bộ lọc
+  assert public.report_counts('{}') = jsonb_build_object('all', jsonb_array_length(fx -> 'records'), 'filtered', jsonb_array_length(fx -> 'records')),
+    'report_counts {}: ' || public.report_counts('{}')::text; c := c + 1;
+  assert (public.report_counts('{"site":"Kho 1"}') ->> 'filtered')::int
+         = (select count(*) from jsonb_array_elements(fx -> 'records') e where e ->> 'site' = 'Kho 1'),
+    'report_counts site: ' || public.report_counts('{"site":"Kho 1"}')::text; c := c + 1;
+  assert not has_function_privilege('anon', 'public.report_counts(jsonb)', 'execute'), 'anon không được gọi report_counts'; c := c + 1;
   assert not has_function_privilege('anon', 'public.report_totals(date,date,jsonb,text,date)', 'execute'), 'anon không được gọi'; c := c + 1;
   assert not has_function_privilege('anon', 'public.report_meta(date)', 'execute'), 'anon không được gọi report_meta'; c := c + 1;
 

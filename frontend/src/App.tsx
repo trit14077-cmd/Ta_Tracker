@@ -12,6 +12,8 @@ import { authService, type UserProfile } from './services/authService.ts';
 import { configError } from './lib/supabase.ts';
 import { UserAdminView } from './components/UserAdminView.tsx';
 import { CandidateTableView } from './components/CandidateTableView.tsx';
+import { OverviewDashboard } from './components/OverviewDashboard.tsx';
+import { FollowWdView } from './components/FollowWdView.tsx';
 import { candidateService, type DropdownDataResponse } from './services/candidateService.ts';
 
 type NavTab = 'candidates' | 'tasks' | 'calendar' | 'targets' | 'import_excel' | 'reports' | 'follow_wd' | 'droplist' | 'audit' | 'users';
@@ -34,7 +36,7 @@ const TITLES: Record<NavTab, string> = {
   users: 'Quản trị Tài khoản Người dùng',
 };
 // Màn hình đã chuyển sang hệ mới. Các mục khác hiện mờ cho tới khi chuyển xong (IMPLEMENTATION_TASKS M4–M7).
-const READY: NavTab[] = ['users', 'candidates'];
+const READY: NavTab[] = ['users', 'candidates', 'reports', 'follow_wd'];
 
 export default function App() {
   const [sidebarW, setSidebarW] = useState<number>(() => {
@@ -413,6 +415,10 @@ export default function App() {
               globalSearch=""
               onRefreshDropdowns={loadDropdowns}
             />
+          ) : activeTab === 'reports' ? (
+            <OverviewDashboard user={user} />
+          ) : activeTab === 'follow_wd' ? (
+            <FollowWdView user={user} dropdowns={dropdowns} />
           ) : (
             <div className="bg-white border border-slate-200 rounded-lg p-8 text-center text-xs text-slate-600 space-y-2">
               <Construction className="w-8 h-8 text-slate-400 mx-auto" />

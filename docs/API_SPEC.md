@@ -118,6 +118,7 @@ Tất cả `SECURITY INVOKER` (trừ `check_*`), nhận tham số `jsonb`, trả
 | `public.report_trend(p_from, p_to, p_filters)` – 0011 | | `TrendPoint[]` (month, ob, att, start, churn) |
 | `public.report_sources(p_periods, p_filters, p_today=null)` – 0011 | như `report_series` | `SourcePeriod[]` không kèm `p` |
 | `public.report_reasons(p_from, p_to, p_filters)` – 0011 | | `{r1_fail, lu_no, no_show, r2_fail, ob_no}` – dữ liệu lý do của 5 biểu đồ tròn; client ghép với `Totals` thành `DonutData` |
+| `public.report_counts(p_filters)` – 0012 | | `{all, filtered}` – số hồ sơ được xem / sau bộ lọc (dòng "x / y ứng viên") |
 | `public.report_meta(p_today=null)` – 0011 | | `{today (giờ VN), min_date (= MIN_DATE), options:{pic, site, source, sub_source, region, dept, position}}` trên toàn bộ hồ sơ được xem |
 | `public.report_detail(p_from, p_to, p_filters, p_limit, p_cursor)` | | bảng chi tiết phân trang (thay `reports/rows`, `FollowWdView`, export) |
 | `public.board_counts(p_filters)` | | `{lead,r1,lusu,r2,ob}` + chỉ số phụ `BoardSub` |
@@ -210,3 +211,4 @@ Trong 2 tuần chạy song song: hệ cũ **chỉ đọc**; chỉ một hệ đ�
 | 1.1 | 19/11/2026 | `records-save` gọi `create_record`/`save_record` bằng service_role kèm `p_actor` (DATABASE_SCHEMA 1.2) |
 | 1.2 | 19/11/2026 | PO chốt khi đối chiếu hệ cũ: `archive`/`restore` – TA làm được với hồ sơ PIC mình (như hệ cũ), không chỉ Admin; đổi `candidate_code` khi `patch` – chỉ Admin, kiểm trùng (0009). Lỗi thêm: `STEP_LOCKED` 422 (sửa bước sau vòng rớt), `MOVE_*` 409 (kéo thả không hợp lệ), `FORBIDDEN_PIC` / `FORBIDDEN_PIC_CHANGE` 403. Phản hồi: `{record, notices, duplicates:{phone}}` (trùng SĐT của PIC khác bị che như hệ cũ) |
 | 1.3 | 19/11/2026 | M5-1 (0011): RPC báo cáo theo kỳ nhận danh sách kỳ `p_periods` do client tạo (dùng lại `periodsOf`/`usePeriods` của hệ cũ) thay vì `p_gran`; thêm `report_series`, `report_reasons`, `report_meta`; mọi hàm có `p_today` (mặc định hôm nay giờ VN) để test; lọc thêm `sub_source`, `site`. `report_detail` chuyển sang M5-3 (cùng FollowWdView) |
+| 1.4 | 19/11/2026 | M5-3: thêm `report_counts` (0012). Target OB/tháng = `app_settings.ob_target` (đọc: mọi người; ghi: Admin, qua PostgREST). Follow WD dùng `list_candidates` (ob_status = Joined) + `records-save`, không cần `report_detail` – bỏ khỏi kế hoạch |
