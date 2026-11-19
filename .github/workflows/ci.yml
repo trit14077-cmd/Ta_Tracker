@@ -30,6 +30,16 @@ jobs:
       - run: npm run lint
       - run: npm run test
 
+  edge:
+    name: Kiểm kiểu Edge Functions (Deno)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: denoland/setup-deno@v2.0.5
+        with:
+          deno-version: v2.9.4
+      - run: deno check supabase/functions/*/index.ts
+
   python:
     name: Kiểm cú pháp script ETL
     runs-on: ubuntu-24.04
@@ -38,7 +48,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - run: python -m py_compile scripts/etl/*.py
+      - run: python -m py_compile scripts/etl/*.py scripts/ops/*.py
 
   db:
     name: Migrations + test RLS (Postgres 17 trống)

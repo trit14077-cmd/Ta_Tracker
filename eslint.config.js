@@ -11,6 +11,11 @@ export default tseslint.config(
     },
   },
   {
+    // Edge Function chạy trên Deno
+    files: ['supabase/functions/**/*.ts'],
+    languageOptions: { globals: { Deno: 'readonly' } },
+  },
+  {
     // script chạy bằng Node
     files: ['scripts/**/*.mjs'],
     languageOptions: { globals: { console: 'readonly', process: 'readonly', URL: 'readonly' } },
