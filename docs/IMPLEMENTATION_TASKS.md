@@ -42,9 +42,9 @@ Kích cỡ: S ≤ nửa ngày, M ≈ 1–2 ngày, L ≈ 3–5 ngày công của 
 
 | ID | Việc | Cỡ | Hoàn thành khi |
 |---|---|---|---|
-| M1-1 | Chuyển `src/shared/*.ts` vào `NEW/shared/` (package nội bộ) dùng chung cho frontend, Edge Function (Deno), script migrate; bỏ `gasEntry.ts`, `bcrypt` | M | build được ở cả Vite và Deno |
-| M1-2 | Port test hiện có của logic thuần (từ `apps-script/test/run*.mjs`) thành test độc lập (Vitest) cho: validation, pipelineRules, stage, reasonRules, dashboardCalc, candidateCode, documentRules, hrInfoRules | M | ≥ số ca hiện có; chạy trong CI |
-| M1-3 | Xuất **golden fixtures**: bộ hồ sơ seed + kết quả `totals/boardPosition/currentStage` do code cũ sinh (JSON) | S | file fixture commit được (dữ liệu giả) |
+| M1-1 | Chuyển `src/shared/*.ts` vào `NEW/shared/` (package nội bộ) dùng chung cho frontend, Edge Function (Deno), script migrate; bỏ `gasEntry.ts`, `bcrypt` | M | build được ở cả Vite và Deno – **19/11: đã chép nguyên văn 20 file (so từng byte với OLD), bỏ `gasEntry.ts`; `tsc --strict` + lint đạt. Còn: thử build ở Vite (M4) và Deno (M4-1)** |
+| M1-2 | Port test hiện có của logic thuần (từ `apps-script/test/run*.mjs`) thành test độc lập (Vitest) cho: validation, pipelineRules, stage, reasonRules, dashboardCalc, candidateCode, documentRules, hrInfoRules | M | ≥ số ca hiện có; chạy trong CI – **19/11: 91 ca trong `tests/shared/`.** Test cũ là test tích hợp qua API Apps Script (676 check, phần lớn về Sheets/cache/workspace/auth không còn áp dụng); đã chuyển toàn bộ check về quy tắc nghiệp vụ thành test gọi thẳng hàm. `hrInfoRules`, `dashboardCalc` được phủ ở M1-3; test riêng `hrInfoRules` bổ sung ở M6-4 |
+| M1-3 | Xuất **golden fixtures**: bộ hồ sơ seed + kết quả `totals/boardPosition/currentStage` do code cũ sinh (JSON) | S | file fixture commit được (dữ liệu giả) – **19/11: `tests/golden/fixture.json`** (400 hồ sơ giả sinh cố định; stage, ô Kanban, chỉ số phụ, số field khóa; totals/rates/retention theo 4 khoảng, theo PIC, trend). Là oracle cho M5-1/M5-2 |
 
 ## M2 – Database + RLS (cổng G2)
 
