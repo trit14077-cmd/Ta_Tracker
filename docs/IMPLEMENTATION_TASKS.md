@@ -93,9 +93,9 @@ Kích cỡ: S ≤ nửa ngày, M ≈ 1–2 ngày, L ≈ 3–5 ngày công của 
 
 | ID | Việc | Cỡ | Hoàn thành khi |
 |---|---|---|---|
-| M6-1 | Tasks, Interviews, Calendar, Targets | L | – **20/11: 0015 + chép TasksView, CalendarView, TargetsView, CandidateOpsPanel (lại vào cửa sổ chi tiết hồ sơ; xác nhận tuyển chờ M6-2); opsService giữ tên hàm dataService cũ. PO chốt 20/11 giữ như hệ cũ: TA sửa/xóa việc gắn hồ sơ PIC mình, chỉ người tạo/Admin xóa phỏng vấn, ghi nhật ký TASK/INTERVIEW/TARGET ngay (trigger). ops_test 44 check; lịch 1 tháng tại máy (20.000 hồ sơ) Admin ≤ 114 ms, TA ≤ 14 ms. Còn: CI, áp DEV, PO thử** |
-| M6-2 | Hiring checklist + Xác nhận tuyển (khóa/mở lại Admin) | M | |
-| M6-3 | Alerts (chuông) | S | |
+| M6-1 | Tasks, Interviews, Calendar, Targets | L | – **20/11: 0015 + chép TasksView, CalendarView, TargetsView, CandidateOpsPanel (lại vào cửa sổ chi tiết hồ sơ; xác nhận tuyển chờ M6-2); opsService giữ tên hàm dataService cũ. PO chốt 20/11 giữ như hệ cũ: TA sửa/xóa việc gắn hồ sơ PIC mình, chỉ người tạo/Admin xóa phỏng vấn, ghi nhật ký TASK/INTERVIEW/TARGET ngay (trigger). ops_test 44 check; lịch 1 tháng tại máy (20.000 hồ sơ) Admin ≤ 114 ms, TA ≤ 14 ms. CI xanh; **0015 đã áp DEV** (lịch T10 Admin: 1.726 mục = đếm trực tiếp ngày R1/R2/OB, 1.179 ứng viên, 339 ms; anon không gọi được; cảnh báo mới duy nhất: rr_target_actual là definer – cố ý, có kiểm can_view_target). Còn: PO thử** |
+| M6-2 | Hiring checklist + Xác nhận tuyển (khóa/mở lại Admin) | M | – **20/11: 0016 (hiring_state, hire_confirm) + records-save confirm_hire/reopen_hire, kiểm bằng `records-save/hiring.ts` (dùng chung giao diện); hiring.test 10 ca, ops_test thêm 17 check (61). Còn: CI, áp DEV + deploy records-save, PO thử** |
+| M6-3 | Alerts (chuông) | S | – **20/11: 0017 alerts + chép AlertsBell lên thanh đầu trang (bấm hồ sơ mở cửa sổ chi tiết, "Xem công việc" sang màn Công việc). Giai đoạn khớp currentStage 410/410 golden; alerts_test 12 check, thử 6 lỗi cố ý đều bị bắt; ~9 ms trên 20.000 hồ sơ. Còn: CI, áp DEV, PO thử** |
 | M6-4 | HR Info: Edge `hr-info-save`, `hr-form`, banner (`HrInfoBanner`), trùng CCCD | L | |
 | M6-5 | Audit view (`AuditLogView`), chính sách lưu 12 tháng (`purge_audit` + xuất Drive) | M | |
 

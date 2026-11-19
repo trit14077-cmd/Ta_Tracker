@@ -9,7 +9,7 @@ declare
   t2 uuid := '00000000-0000-4000-8000-0000000007b2';
   r1 bigint; r2 bigint; r3 bigint; r4 bigint;
   k1 bigint; k2 bigint; k3 bigint;
-  j jsonb; n int;
+  j jsonb; n int; r5 bigint; v int;
   td date := '2026-11-19';
 begin
   insert into auth.users (id) values (a), (t1), (t2);
@@ -167,6 +167,64 @@ begin
   assert not has_function_privilege('anon', 'public.calendar_range(date,date,text)', 'execute'), 'anon calendar_range'; c := c + 1;
   assert not has_function_privilege('anon', 'public.target_list(text,text,date,date)', 'execute'), 'anon target_list'; c := c + 1;
   assert not has_function_privilege('anon', 'app.username(uuid)', 'execute'), 'anon app.username'; c := c + 1;
+
+  -- ---------- M6-2: xác nhận tuyển (0016 hire_confirm – Edge gọi bằng service_role) ----------
+  execute 'reset role';
+  insert into public.recruitment_records (candidate_code, full_name, pic, r1_status, r2_status, ob_date, ob_status)
+    values ('OPS05', 'Ứng viên Năm', 'OPS-P1', 'Passed', 'Passed', '2026-12-01', 'Pending') returning id, row_version into r5, v;
+  insert into public.hiring_checklists (record_id, items) values (r5, '{"offer_sent":{"done":true},"salary_agreed":{"done":true}}');
+  begin
+    perform public.hire_confirm(t1, r5, true, array['offer_sent','salary_agreed','offer_accepted']);
+    assert false, 'thiếu mục tay phải bị từ chối';
+  exception when others then
+    assert sqlstate = 'PT400' and sqlerrm = 'HIRING_INCOMPLETE', 'thiếu mục: ' || sqlstate || ' ' || sqlerrm; c := c + 1;
+  end;
+  update public.hiring_checklists set items = items || '{"offer_accepted":{"done":true}}' where record_id = r5;
+  begin
+    perform public.hire_confirm(t2, r5, true, array['offer_sent','salary_agreed','offer_accepted']);
+    assert false, 'TA PIC khác phải bị từ chối';
+  exception when others then
+    assert sqlstate = 'PT404', 'TA PIC khác: ' || sqlstate; c := c + 1;
+  end;
+  j := public.hire_confirm(t1, r5, true, array['offer_sent','salary_agreed','offer_accepted']);
+  assert (j ->> 'ob_updated')::boolean and j -> 'record' ->> 'ob_status' = 'Accepted' and (j -> 'record' ->> 'row_version')::int = v + 1,
+    'xác nhận: OB Status Pending -> Accepted qua save_record – ' || j::text; c := c + 1;
+  assert (select confirmed and confirmed_by = t1 and confirmed_at is not null from public.hiring_checklists where record_id = r5), 'checklist đã khóa'; c := c + 1;
+  assert exists (select 1 from public.status_history where record_id = r5 and kind = 'CONFIRM_HIRE'), 'lịch sử CONFIRM_HIRE'; c := c + 1;
+  assert exists (select 1 from public.audit_logs where record_id = r5 and action = 'HIRING' and changes -> 'confirmed' ->> 'new' = 'Xác nhận tuyển'), 'nhật ký HIRING'; c := c + 1;
+  assert exists (select 1 from public.status_history where record_id = r5 and kind = 'STATUS' and field_key = 'ob_status' and to_value = 'Accepted'),
+    'đổi OB Status có lịch sử như sửa thường'; c := c + 1;
+  begin
+    perform public.hire_confirm(t1, r5, true, '{}');
+    assert false, 'xác nhận lần 2 phải bị từ chối';
+  exception when others then
+    assert sqlstate = 'PT409' and sqlerrm = 'LOCKED', 'xác nhận lần 2: ' || sqlstate; c := c + 1;
+  end;
+  -- TA không sửa checklist khi đã khóa (RLS hc_update)
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.sub', t1::text, true);
+  update public.hiring_checklists set items = '{}' where record_id = r5;
+  get diagnostics n = row_count;
+  assert n = 0, 'TA không sửa checklist đã khóa'; c := c + 1;
+  j := public.hiring_state(r5);
+  assert (j ->> 'confirmed')::boolean and j ->> 'confirmed_by' = 'ops_t1', 'hiring_state: tên người xác nhận – ' || j::text; c := c + 1;
+  assert public.hiring_state(r2) is null, 'hiring_state hồ sơ PIC khác: null'; c := c + 1;
+  assert not has_function_privilege('authenticated', 'public.hire_confirm(uuid,bigint,boolean,text[])', 'execute'), 'người dùng không gọi thẳng hire_confirm'; c := c + 1;
+  execute 'reset role';
+  begin
+    perform public.hire_confirm(t1, r5, false, '{}');
+    assert false, 'TA mở lại phải bị từ chối';
+  exception when others then
+    assert sqlstate = 'PT403', 'TA mở lại: ' || sqlstate; c := c + 1;
+  end;
+  j := public.hire_confirm(a, r5, false, '{}');
+  assert not (j ->> 'ob_updated')::boolean and j -> 'record' ->> 'ob_status' = 'Accepted', 'mở lại không đổi OB Status'; c := c + 1;
+  assert (select not confirmed and confirmed_by is null from public.hiring_checklists where record_id = r5), 'Admin mở lại'; c := c + 1;
+  assert exists (select 1 from public.status_history where record_id = r5 and kind = 'REOPEN_HIRE'), 'lịch sử REOPEN_HIRE'; c := c + 1;
+  -- OB Status đã có giá trị khác trống/Pending: xác nhận không đổi
+  update public.recruitment_records set ob_status = 'Joined' where id = r5;
+  j := public.hire_confirm(a, r5, true, array['offer_sent','salary_agreed','offer_accepted']);
+  assert not (j ->> 'ob_updated')::boolean and j -> 'record' ->> 'ob_status' = 'Joined', 'OB Joined giữ nguyên'; c := c + 1;
 
   raise notice 'OPS_TEST_PASSED: % check đạt', c;
 end $$;

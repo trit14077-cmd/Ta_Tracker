@@ -112,6 +112,10 @@ jobs:
         run: |
           psql -v ON_ERROR_STOP=1 -f supabase/tests/ops_test.sql 2>&1 | tee ops.log
           grep -q "OPS_TEST_PASSED" ops.log
+      - name: Chuông nhắc việc (0017) – giai đoạn khớp currentStage trên golden (tự rollback)
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/alerts_test.sql 2>&1 | tee alerts.log
+          grep -q "ALERTS_TEST_PASSED" alerts.log
       - name: 20 phiên đồng thời tạo mã cùng PIC không trùng
         run: bash supabase/tests/concurrency_codes.sh
 

@@ -55,6 +55,9 @@ begin
       ('O1 calendar_range 1 tháng',       'admin', 'select public.calendar_range(''2026-10-01'', ''2026-10-31'', '''')'),
       ('O2 calendar_range 1 tháng',       'ta',    'select public.calendar_range(''2026-10-01'', ''2026-10-31'', '''')'),
       ('O3 list_tasks tất cả',            'admin', 'select public.list_tasks(''all'', null, ''2026-11-19'')'),
+      -- M6-3: chuông (gọi mỗi 5 phút / mỗi người)
+      ('A1 alerts',                       'admin', 'select public.alerts(''2026-11-19'')'),
+      ('A2 alerts',                       'ta',    'select public.alerts(''2026-11-19'')'),
       ('CH bình luận của 1 hồ sơ',        'ta',    format('select * from public.comments where record_id = %s order by created_at', v_rec))
     ) v(label, who, sql)
   loop

@@ -221,7 +221,7 @@ type DupRow = { id: number; candidate_code: string; full_name: string; pic: stri
 
 /** Lỗi từ Edge Function ({error:{code,message,fields,details}}) -> ApiError mà các màn hình cũ hiểu.
  *  VERSION_CONFLICT đổi thành ROW_CONFLICT + currentRow như API cũ (ConflictResolutionModal). */
-async function fnError(error: unknown, fallback: string): Promise<ApiError> {
+export async function fnError(error: unknown, fallback: string): Promise<ApiError> {
   const ctx = (error as { context?: Response }).context;
   let status = 500;
   let body: { error?: { code?: string; message?: string; fields?: Record<string, string>; details?: { current?: Record<string, unknown> } } } = {};

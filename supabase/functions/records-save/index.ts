@@ -8,6 +8,7 @@ import {
   type Actor, type ApiError,
 } from './logic.ts';
 import { corsHeaders } from '../admin-users/logic.ts';
+import { hiringView, planHire, type HiringRow } from './hiring.ts';
 
 const URL_ = Deno.env.get('SUPABASE_URL')!;
 const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -84,6 +85,23 @@ Deno.serve(async (req) => {
     const { data: row } = await db.from('recruitment_records').select('*').eq('id', r.id).maybeSingle();
     const canSee = row && (actor.role === 'admin' || (!!row.pic && row.pic === actor.pic_code));
     if (!canSee) return fail({ status: 404, code: 'NOT_FOUND', message: 'Không tìm thấy hồ sơ ứng viên.' });
+
+    // ---------- M6-2: xác nhận tuyển / mở lại (Ops.gs hHireConfirm_) ----------
+    if (r.op === 'confirm_hire' || r.op === 'reopen_hire') {
+      const confirm = r.op === 'confirm_hire';
+      const state = async (id: number) => (await db.rpc('hiring_state', { p_record_id: id })).data as HiringRow | null;
+      const before = hiringView(rowToStrings(row), await state(r.id));
+      const plan = planHire(actor, rowToStrings(row), before, confirm);
+      if (!plan.ok) return fail(plan.error);
+      const { data, error } = await db.rpc('hire_confirm', { p_actor: actor.id, p_id: r.id, p_confirm: confirm, p_manual: plan.manualKeys });
+      if (error) return fail(mapRpcError(error));
+      const res = data as { record: Record<string, unknown>; ob_updated: boolean };
+      return json(200, {
+        record: res.record, notices: {}, duplicates: { phone: [] }, ob_updated: res.ob_updated,
+        hiring: hiringView(rowToStrings(res.record), await state(r.id)),
+      });
+    }
+
     if (row.row_version !== r.expected_version) {
       return fail({ status: 409, code: 'VERSION_CONFLICT', message: 'Hồ sơ ứng viên này vừa được người dùng khác cập nhật. Vui lòng đối chiếu phiên bản hiện tại trước khi ghi đè.', details: { current: row } });
     }

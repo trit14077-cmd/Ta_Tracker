@@ -12,7 +12,8 @@ export type SaveRequest =
   | { op: 'create'; values: Record<string, unknown>; from_application_id?: number }
   | { op: 'patch'; id: number; expected_version: number; changes: Record<string, unknown> }
   | { op: 'move'; id: number; expected_version: number; target_box: string }
-  | { op: 'archive' | 'restore'; id: number; expected_version: number };
+  | { op: 'archive' | 'restore'; id: number; expected_version: number }
+  | { op: 'confirm_hire' | 'reopen_hire'; id: number };
 
 const err = (status: number, code: string, message: string, extra: Partial<ApiError> = {}): ApiError => ({ status, code, message, ...extra });
 
@@ -43,8 +44,13 @@ export function parseRequest(body: unknown): { ok: true; req: SaveRequest } | { 
       }
       return { ok: true, req: { op: b.op, id: b.id as number, expected_version: b.expected_version as number } };
     }
+    case 'confirm_hire':
+    case 'reopen_hire':
+      // M6-2: như hệ cũ (POST …/hiring/confirm) không cần phiên bản hồ sơ; RPC khóa dòng trong giao dịch
+      if (!posInt(b.id)) return bad('Thiếu hoặc sai id hồ sơ.');
+      return { ok: true, req: { op: b.op, id: b.id as number } };
     default:
-      return { ok: false, error: err(422, 'INVALID_OP', 'op phải là create, patch, move, archive hoặc restore.') };
+      return { ok: false, error: err(422, 'INVALID_OP', 'op phải là create, patch, move, archive, restore, confirm_hire hoặc reopen_hire.') };
   }
 }
 

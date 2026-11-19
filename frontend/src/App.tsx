@@ -20,6 +20,7 @@ import { CandidateDetailModal } from './components/CandidateDetailModal.tsx';
 import { TasksView } from './components/TasksView.tsx';
 import { CalendarView } from './components/CalendarView.tsx';
 import { TargetsView } from './components/TargetsView.tsx';
+import { AlertsBell } from './components/AlertsBell.tsx';
 import { candidateService, type CandidateRecord, type DropdownDataResponse } from './services/candidateService.ts';
 
 type NavTab = 'candidates' | 'tasks' | 'calendar' | 'targets' | 'import_excel' | 'reports' | 'follow_wd' | 'droplist' | 'audit' | 'users';
@@ -427,6 +428,8 @@ export default function App() {
               <span className="mx-1.5">·</span>
               <span>{user.role === 'admin' ? 'Admin' : user.pic_code || 'PIC'}</span>
             </div>
+
+            <AlertsBell onOpenCandidate={openCandidateById} onGoTasks={() => setActiveTab('tasks')} />
 
             <LangSwitch />
 

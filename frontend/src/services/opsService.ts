@@ -3,14 +3,14 @@
 // Đọc: RPC 0015 (list_tasks, list_interviews, calendar_range, target_list). Ghi: thẳng bảng qua PostgREST (RLS 0005);
 // dữ liệu kiểm bằng chính shared/opsRules (validateTask / validateInterview / validateEvent) như server cũ.
 import { supabase } from '../lib/supabase.ts';
-import { ApiError, type CandidateRecord } from './candidateService.ts';
+import { ApiError, fnError, type CandidateRecord } from './candidateService.ts';
 import type { UserProfile } from './authService.ts';
 import {
   HIRING_ITEMS, TARGET_PERIODS, periodKeyOf, periodRange, validateEvent, validateInterview, validateTask,
   type TargetPeriod,
 } from '../../../shared/opsRules.ts';
-import { requiredDocuments } from '../../../shared/documentRules.ts';
 import { hrEligible } from '../../../shared/hrInfoRules.ts';
+import { hiringView, type HiringRow, type HiringState } from '../../../supabase/functions/records-save/hiring.ts';
 import { userAdminService } from './userAdminService.ts';
 
 export interface CandidateBrief {
@@ -45,6 +45,14 @@ export interface CalendarEvent extends CandidateBrief {
   note: string;
   owner?: string;
 }
+export interface AlertsData {
+  counts: { overdue: number; due_soon: number; passed_no_hr: number; missing_docs: number };
+  overdue: TaskItem[];
+  due_soon: TaskItem[];
+  passed_no_hr: CandidateBrief[];
+  missing_docs: (CandidateBrief & { detail: string })[];
+  today: string;
+}
 export interface TargetRow {
   id: number;
   period_type: string;
@@ -69,13 +77,7 @@ export interface InterviewItem {
   created_by: string;
   source: 'history' | 'profile';
 }
-export interface HiringState {
-  eligible: boolean;
-  items: { key: string; label: string; auto: boolean; done: boolean; by: string; at: string }[];
-  confirmed: boolean;
-  confirmed_by: string;
-  confirmed_at: string;
-}
+export type { HiringState };
 
 function invalid(errors: Record<string, string>): ApiError {
   return new ApiError('Dữ liệu chưa hợp lệ: ' + Object.values(errors).join(' '), 400, 'VALIDATION_FAILED', errors);
@@ -91,6 +93,7 @@ function noRow(what: string): ApiError {
   return new ApiError(`Không tìm thấy ${what} hoặc bạn không có quyền sửa.`, 404, 'NOT_FOUND');
 }
 
+let lastAlerts: AlertsData | null = null;
 let myId: string | null = null;
 async function uid(): Promise<string> {
   if (myId) return myId;
@@ -107,6 +110,18 @@ async function ownerIdOf(username: string): Promise<string | null> {
 }
 
 export const opsService = {
+  // ---------------- chuông (M6-3)
+  /** Bản lần trước (hệ cũ giữ trong bộ nhớ đệm) để chuông hiện ngay khi mở trang. */
+  peekAlerts(): AlertsData | null {
+    return lastAlerts;
+  },
+  async getAlerts(): Promise<AlertsData> {
+    const { data, error } = await supabase.rpc('alerts', {});
+    if (error) throw dbError(error, 'Không tải được nhắc việc.');
+    lastAlerts = data as AlertsData;
+    return lastAlerts;
+  },
+
   // ---------------- công việc
   async listTasks(view: string, candidateId?: number): Promise<{ tasks: TaskItem[]; today: string }> {
     const { data, error } = await supabase.rpc('list_tasks', { p_view: view, p_record_id: candidateId || null });
@@ -190,44 +205,33 @@ export const opsService = {
     if (!data?.length) throw noRow('buổi phỏng vấn');
   },
 
-  // ---------------- checklist tuyển (M6-2: xác nhận tuyển qua records-save chưa làm)
+  // ---------------- checklist tuyển (M6-2). Hiển thị = hiringView dùng chung với Edge records-save.
   async getHiring(candidateId: number, candidate?: CandidateRecord): Promise<HiringState> {
-    const [{ data: rec }, { data: hr }] = await Promise.all([
-      supabase.from('hiring_checklists').select('items, confirmed, confirmed_by, confirmed_at').eq('record_id', candidateId).maybeSingle(),
-      supabase.from('hr_info').select('status').eq('record_id', candidateId).maybeSingle(),
-    ]);
-    const row = candidate || ({} as CandidateRecord);
-    const need = requiredDocuments(String(row.position || ''), String(row.rank || ''));
-    const auto: Record<string, boolean> = {
-      docs_complete: need.every((k) => Boolean(String(row[k] ?? ''))),
-      hr_verified: hr?.status === 'verified',
-      ob_date_set: Boolean(String(row.ob_date ?? '')),
-    };
-    const manual = ((rec?.items as Record<string, { done?: boolean; by?: string; at?: string }>) || {});
-    return {
-      eligible: hrEligible(row as unknown as Record<string, unknown>),
-      items: HIRING_ITEMS.map((it) => it.auto
-        ? { key: it.key, label: it.label, auto: true, done: Boolean(auto[it.key]), by: '', at: '' }
-        : { key: it.key, label: it.label, auto: false, done: Boolean(manual[it.key]?.done), by: String(manual[it.key]?.by || ''), at: String(manual[it.key]?.at || '') }),
-      confirmed: Boolean(rec?.confirmed),
-      confirmed_by: rec?.confirmed_by ? '(đã xác nhận)' : '',
-      confirmed_at: String(rec?.confirmed_at || ''),
-    };
+    const { data, error } = await supabase.rpc('hiring_state', { p_record_id: candidateId });
+    if (error) throw dbError(error, 'Không tải được checklist tuyển.');
+    if (!data) throw new ApiError('Không tìm thấy hồ sơ ứng viên.', 404, 'NOT_FOUND');
+    return hiringView((candidate || {}) as unknown as Record<string, unknown>, data as HiringRow);
   },
+  /** Tick tay 1 mục (RLS hc_update: TA không sửa được khi đã xác nhận). */
   async setHiringItem(candidateId: number, key: string, done: boolean, candidate?: CandidateRecord): Promise<HiringState> {
     const item = HIRING_ITEMS.find((it) => it.key === key);
     if (!item || item.auto) throw new ApiError('Mục này không tick tay được.', 400, 'INVALID_INPUT');
     if (candidate && !hrEligible(candidate as unknown as Record<string, unknown>)) throw new ApiError('Chỉ dùng cho ứng viên đã đạt vòng 2.', 400, 'NOT_ELIGIBLE');
-    const { data: rec } = await supabase.from('hiring_checklists').select('items, confirmed').eq('record_id', candidateId).maybeSingle();
-    if (rec?.confirmed) throw new ApiError('Đã xác nhận tuyển. Admin mở lại trước khi sửa.', 409, 'LOCKED');
+    const { data: st } = await supabase.rpc('hiring_state', { p_record_id: candidateId });
+    const cur = st as HiringRow | null;
+    if (!cur) throw new ApiError('Không tìm thấy hồ sơ ứng viên.', 404, 'NOT_FOUND');
+    if (cur.confirmed) throw new ApiError('Đã xác nhận tuyển. Admin mở lại trước khi sửa.', 409, 'LOCKED');
     const { data: me } = await supabase.from('profiles').select('username').eq('id', await uid()).maybeSingle();
-    const items = { ...((rec?.items as Record<string, unknown>) || {}), [key]: { done, by: me?.username || '', at: new Date().toISOString() } };
+    const items = { ...(cur.items || {}), [key]: { done, by: me?.username || '', at: new Date().toISOString() } };
     const { error } = await supabase.from('hiring_checklists').upsert({ record_id: candidateId, items, updated_at: new Date().toISOString() });
     if (error) throw dbError(error, 'Không lưu được checklist.');
     return this.getHiring(candidateId, candidate);
   },
-  async confirmHiring(_candidateId: number, _confirmed: boolean): Promise<{ hiring: HiringState; ob_updated?: boolean }> {
-    throw new ApiError('Xác nhận tuyển sẽ có ở bước M6-2 (chuyển OB Status qua records-save). Trong thời gian chuyển đổi, vui lòng xác nhận trên hệ thống cũ.', 501, 'NOT_AVAILABLE');
+  /** Xác nhận tuyển (mọi người có quyền hồ sơ) / mở lại (Admin) qua Edge records-save – OB Status = Accepted nếu trống/Pending. */
+  async confirmHiring(candidateId: number, confirmed: boolean): Promise<{ hiring: HiringState; ob_updated?: boolean }> {
+    const { data, error } = await supabase.functions.invoke('records-save', { body: { op: confirmed ? 'confirm_hire' : 'reopen_hire', id: candidateId } });
+    if (error) throw await fnError(error, 'Không thực hiện được xác nhận tuyển.');
+    return data as { hiring: HiringState; ob_updated?: boolean };
   },
 
   // ---------------- target
