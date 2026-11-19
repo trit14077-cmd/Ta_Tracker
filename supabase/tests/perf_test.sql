@@ -45,6 +45,11 @@ begin
       ('R6 report_trend 2 năm',           'ta',    'select public.report_trend(''2025-01-01'', ''2026-11-19'', ''{}'')'),
       ('R7 report_reasons YTD',           'admin', 'select public.report_reasons(''2026-01-01'', ''2026-11-19'', ''{}'')'),
       ('R8 report_meta',                  'admin', 'select public.report_meta(''2026-11-19'')'),
+      -- M5-4: Kanban
+      ('B1 board_page',                   'admin', 'select public.board_page(''{}'', '''')'),
+      ('B2 board_page',                   'ta',    'select public.board_page(''{}'', '''')'),
+      ('B3 board_page tìm tên',           'admin', 'select public.board_page(''{}'', ''văn'')'),
+      ('B4 board_cards ô R1 trang 5',     'admin', 'select public.board_cards(''r1'', 120, ''{}'', '''')'),
       ('CH bình luận của 1 hồ sơ',        'ta',    format('select * from public.comments where record_id = %s order by created_at', v_rec))
     ) v(label, who, sql)
   loop

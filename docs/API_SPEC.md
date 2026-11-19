@@ -122,7 +122,9 @@ Tất cả `SECURITY INVOKER` (trừ `check_*`), nhận tham số `jsonb`, trả
 | `public.report_meta(p_today=null)` – 0011 | | `{today (giờ VN), min_date (= MIN_DATE), options:{pic, site, source, sub_source, region, dept, position}}` trên toàn bộ hồ sơ được xem |
 | `public.report_detail(p_from, p_to, p_filters, p_limit, p_cursor)` | | bảng chi tiết phân trang (thay `reports/rows`, `FollowWdView`, export) |
 | `public.board_counts(p_filters)` | | `{lead,r1,lusu,r2,ob}` + chỉ số phụ `BoardSub` |
-| `public.board_cards(p_col, p_filters, p_limit=30, p_cursor)` | | thẻ: id, candidate_code, full_name, phone, position, pic, site + `failedAt` |
+| `public.board_page(p_filters, p_q)` – 0013 | `filters`: pic (chỉ Admin), position, region; `p_q` tìm mã/tên/SĐT như `list_candidates` | `{counts:{col:{total, failed}}, columns:{col:[thẻ ≤30]}, page_size:30}` = `hBoard_` |
+| `public.board_cards(p_col, p_offset, p_filters, p_q, p_limit=30)` – 0013 | | `{cards, total}`; thẻ: id, candidate_code, full_name, phone, pic, position, region, location, site, row_version, updated_at, failed_at; xếp updated_at rồi id giảm dần |
+| `public.stage_history(p_record_id)` – 0013 | | lịch sử chuyển vòng bằng Kanban `[{id, at, from_box, to_box, actor_username}]` (≤ 50, mới nhất trước) |
 | `public.check_phone(p_phone, p_exclude_id)` | | `{count, same_pic_count}` – không trả mã/PIC khác |
 | `public.next_candidate_code(p_pic)` | | `{code}` |
 | `public.alerts()` | | `{overdue, due_soon, hr_missing, offer_docs_missing}` + danh sách rút gọn |
@@ -212,3 +214,4 @@ Trong 2 tuần chạy song song: hệ cũ **chỉ đọc**; chỉ một hệ đ�
 | 1.2 | 19/11/2026 | PO chốt khi đối chiếu hệ cũ: `archive`/`restore` – TA làm được với hồ sơ PIC mình (như hệ cũ), không chỉ Admin; đổi `candidate_code` khi `patch` – chỉ Admin, kiểm trùng (0009). Lỗi thêm: `STEP_LOCKED` 422 (sửa bước sau vòng rớt), `MOVE_*` 409 (kéo thả không hợp lệ), `FORBIDDEN_PIC` / `FORBIDDEN_PIC_CHANGE` 403. Phản hồi: `{record, notices, duplicates:{phone}}` (trùng SĐT của PIC khác bị che như hệ cũ) |
 | 1.3 | 19/11/2026 | M5-1 (0011): RPC báo cáo theo kỳ nhận danh sách kỳ `p_periods` do client tạo (dùng lại `periodsOf`/`usePeriods` của hệ cũ) thay vì `p_gran`; thêm `report_series`, `report_reasons`, `report_meta`; mọi hàm có `p_today` (mặc định hôm nay giờ VN) để test; lọc thêm `sub_source`, `site`. `report_detail` chuyển sang M5-3 (cùng FollowWdView) |
 | 1.4 | 19/11/2026 | M5-3: thêm `report_counts` (0012). Target OB/tháng = `app_settings.ob_target` (đọc: mọi người; ghi: Admin, qua PostgREST). Follow WD dùng `list_candidates` (ob_status = Joined) + `records-save`, không cần `report_detail` – bỏ khỏi kế hoạch |
+| 1.5 | 19/11/2026 | M5-2/M5-4: Kanban dùng `board_page` (thay `/api/board`), `board_cards` theo offset (như hệ cũ, thay cursor), `stage_history`. Kéo thả lưu bằng `records-save` op `move` (đã có từ M4) |

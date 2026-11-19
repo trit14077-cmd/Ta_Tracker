@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { LangSwitch } from './i18n.tsx';
 import {
   Users, FileSpreadsheet, BarChart3, ListFilter, History, ShieldCheck, LogOut, KeyRound, AlertTriangle,
-  ClipboardCheck, ChevronsLeft, ChevronsRight, ListTodo, CalendarDays, Target, Construction,
+  ClipboardCheck, ChevronsLeft, ChevronsRight, ListTodo, CalendarDays, Target, Construction, Table2, SquareKanban, Search,
 } from 'lucide-react';
 import logoUrl from './assets/the-supra-logo.png';
 import { authService, type UserProfile } from './services/authService.ts';
@@ -14,7 +14,9 @@ import { UserAdminView } from './components/UserAdminView.tsx';
 import { CandidateTableView } from './components/CandidateTableView.tsx';
 import { OverviewDashboard } from './components/OverviewDashboard.tsx';
 import { FollowWdView } from './components/FollowWdView.tsx';
-import { candidateService, type DropdownDataResponse } from './services/candidateService.ts';
+import { KanbanBoardView } from './components/KanbanBoardView.tsx';
+import { CandidateFormView } from './components/CandidateFormView.tsx';
+import { candidateService, type CandidateRecord, type DropdownDataResponse } from './services/candidateService.ts';
 
 type NavTab = 'candidates' | 'tasks' | 'calendar' | 'targets' | 'import_excel' | 'reports' | 'follow_wd' | 'droplist' | 'audit' | 'users';
 
@@ -117,6 +119,33 @@ export default function App() {
   const [changingPass, setChangingPass] = useState<boolean>(false);
 
   const [activeTab, setActiveTab] = useState<NavTab>('users');
+  // Danh sách ứng viên: kiểu xem Bảng / Kanban (nhớ trong trình duyệt như hệ cũ, khóa 'supra.candidateView').
+  const [candView, setCandView] = useState<'table' | 'kanban'>(() => {
+    try {
+      return localStorage.getItem('supra.candidateView') === 'kanban' ? 'kanban' : 'table';
+    } catch {
+      return 'table';
+    }
+  });
+  const chooseCandView = (v: 'table' | 'kanban') => {
+    setCandView(v);
+    try {
+      localStorage.setItem('supra.candidateView', v);
+    } catch {
+      // storage may be blocked; the choice just is not remembered
+    }
+  };
+  const showKanban = candView === 'kanban';
+  // Kanban: ô tìm (hệ cũ dùng ô tìm trên thanh đầu trang), form sửa hồ sơ mở từ thẻ, khóa để tải lại sau khi lưu.
+  const [kanbanSearch, setKanbanSearch] = useState('');
+  const [kanbanKey, setKanbanKey] = useState(0);
+  const [kanbanForm, setKanbanForm] = useState<CandidateRecord | null>(null);
+  const [kanbanFormDirty, setKanbanFormDirty] = useState(false);
+  const closeKanbanForm = () => {
+    if (kanbanFormDirty && !window.confirm('Có thay đổi chưa lưu. Đóng cửa sổ và bỏ các thay đổi?')) return;
+    setKanbanFormDirty(false);
+    setKanbanForm(null);
+  };
 
   useEffect(() => {
     (async () => {
@@ -409,12 +438,78 @@ export default function App() {
           {activeTab === 'users' && user.role === 'admin' ? (
             <UserAdminView currentUserId={user.id} />
           ) : activeTab === 'candidates' ? (
-            <CandidateTableView
-              user={user}
-              dropdowns={dropdowns}
-              globalSearch=""
-              onRefreshDropdowns={loadDropdowns}
-            />
+            <div className="space-y-3">
+              <div className="flex items-center justify-end gap-2">
+                {showKanban && (
+                  <label className="inline-flex items-center gap-1.5 h-8 px-2.5 bg-white border border-slate-200 rounded-lg shadow-sm">
+                    <Search className="w-3.5 h-3.5 text-slate-400" />
+                    <input
+                      value={kanbanSearch}
+                      onChange={(e) => setKanbanSearch(e.target.value)}
+                      placeholder="Tìm mã, tên, SĐT…"
+                      className="w-56 text-xs outline-none bg-transparent"
+                    />
+                  </label>
+                )}
+                <div role="tablist" aria-label="Kiểu xem danh sách ứng viên" className="inline-flex p-0.5 rounded-lg border border-slate-200 bg-white shadow-sm">
+                  {([
+                    ['table', 'Bảng', Table2],
+                    ['kanban', 'Kanban', SquareKanban],
+                  ] as const).map(([key, label, Icon]) => {
+                    const on = (key === 'kanban') === showKanban;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        role="tab"
+                        aria-selected={on}
+                        onClick={() => chooseCandView(key)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                          on ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        <Icon className="w-3.5 h-3.5" /> {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {showKanban ? (
+                <KanbanBoardView
+                  key={`kanban-${kanbanKey}`}
+                  user={user}
+                  dropdowns={dropdowns}
+                  globalSearch={kanbanSearch}
+                  onEditCandidate={(c) => setKanbanForm(c)}
+                />
+              ) : (
+                <CandidateTableView
+                  user={user}
+                  dropdowns={dropdowns}
+                  globalSearch=""
+                  onRefreshDropdowns={loadDropdowns}
+                />
+              )}
+              {kanbanForm && (
+                <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/60 p-3 sm:p-6 overflow-y-auto">
+                  <div className="relative w-full max-w-6xl bg-slate-50 rounded-lg shadow-xl border border-slate-200">
+                    <CandidateFormView
+                      user={user}
+                      dropdowns={dropdowns}
+                      editingCandidate={kanbanForm}
+                      onDirtyChange={setKanbanFormDirty}
+                      onSaved={() => {
+                        setKanbanFormDirty(false);
+                        setKanbanForm(null);
+                        setKanbanKey((k) => k + 1);
+                      }}
+                      onCancel={closeKanbanForm}
+                      onRefreshDropdowns={loadDropdowns}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           ) : activeTab === 'reports' ? (
             <OverviewDashboard user={user} />
           ) : activeTab === 'follow_wd' ? (

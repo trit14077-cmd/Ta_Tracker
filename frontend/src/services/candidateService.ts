@@ -130,6 +130,39 @@ export interface HrFormResponse {
   history?: unknown[];
 }
 
+/** Thẻ Kanban (= boardCard_ của Pipeline.gs; RPC board_page / board_cards – 0013). */
+export interface BoardCard {
+  id: number;
+  candidate_code: string;
+  full_name: string;
+  phone: string;
+  pic: string;
+  position: string;
+  region: string;
+  location: string;
+  site: string;
+  row_version: number;
+  updated_at: string;
+  failed_at: '' | 'r1' | 'r2' | 'ob';
+}
+export interface BoardFilters {
+  position?: string;
+  region?: string;
+}
+export interface BoardData {
+  counts: Record<string, { total: number; failed: number }>;
+  columns: Record<string, BoardCard[]>;
+  page_size: number;
+}
+/** Một lần chuyển vòng bằng Kanban (status_history STAGE_MOVE + người làm từ audit_logs – RPC stage_history). */
+export interface StageHistoryItem {
+  id: number;
+  created_at: string;
+  actor_username: string;
+  from_box: string;
+  to_box: string;
+}
+
 export class ApiError extends Error {
   status: number;
   code: string;
@@ -416,6 +449,29 @@ export const candidateService = {
   },
 
   // ===== thẻ KPI: đếm ở server (RPC board_counts), không tải dòng về trình duyệt =====
+  /** Số thẻ + 30 thẻ đầu mỗi ô. pic chỉ có tác dụng với Admin (server bỏ qua với TA, như hệ cũ). */
+  async getBoard(pic: string, q: string, extra: BoardFilters = {}): Promise<BoardData> {
+    const { data, error } = await supabase.rpc('board_page', { p_filters: { pic, ...extra }, p_q: q });
+    if (error || !data) throw new ApiError('Không tải được Kanban.', 500, error?.code || 'BOARD_FAILED');
+    return data as BoardData;
+  },
+  peekBoard(_pic: string, _q: string, _extra: BoardFilters = {}): BoardData | null {
+    return null; // hệ cũ giữ bản sao trong bộ nhớ đệm trình duyệt; bản mới tải thẳng (RPC nhanh)
+  },
+  async getBoardCards(col: string, offset: number, pic: string, q: string, extra: BoardFilters = {}): Promise<{ cards: BoardCard[]; total: number }> {
+    const { data, error } = await supabase.rpc('board_cards', { p_col: col, p_offset: offset, p_filters: { pic, ...extra }, p_q: q });
+    if (error || !data) throw new ApiError('Không tải thêm được thẻ.', 500, error?.code || 'BOARD_FAILED');
+    return data as { cards: BoardCard[]; total: number };
+  },
+  async getStageHistory(recordId: number): Promise<StageHistoryItem[]> {
+    const { data, error } = await supabase.rpc('stage_history', { p_record_id: recordId });
+    if (error) throw new ApiError('Không tải được lịch sử chuyển vòng.', 500, error.code || 'HISTORY_FAILED');
+    return ((data as Record<string, unknown>[]) || []).map((h) => ({
+      id: Number(h.id), created_at: String(h.at || ''), actor_username: String(h.actor_username || ''),
+      from_box: String(h.from_box || ''), to_box: String(h.to_box || ''),
+    }));
+  },
+
   async getBoardCounts(pic?: string): Promise<{ counts: Record<string, { total: number; failed: number }>; subs: Record<string, number> }> {
     const { data, error } = await supabase.rpc('board_counts', { p_pic: pic || '' });
     if (error || !data) throw new ApiError('Không tải được số liệu thẻ KPI.', 500, 'BOARD_COUNTS_FAILED');
