@@ -11,6 +11,11 @@ export default tseslint.config(
     },
   },
   {
+    // script chạy bằng Node
+    files: ['scripts/**/*.mjs'],
+    languageOptions: { globals: { console: 'readonly', process: 'readonly', URL: 'readonly' } },
+  },
+  {
     // shared/ là bản chép NGUYÊN VĂN từ OLD/src/shared (IMPLEMENTATION_TASKS quy tắc 3), không sửa để chiều lint.
     // Các quy tắc dưới chỉ là văn phong: regex lọc ký tự điều khiển (cố ý), escape thừa, 1 import type không dùng.
     files: ['shared/**/*.ts'],

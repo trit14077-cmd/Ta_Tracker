@@ -51,12 +51,12 @@ Kích cỡ: S ≤ nửa ngày, M ≈ 1–2 ngày, L ≈ 3–5 ngày công của 
 | ID | Việc | Cỡ | Hoàn thành khi |
 |---|---|---|---|
 | M2-1 | Migration `0001_core`: `pics`, `profiles`, danh mục, `applicants`, `recruitment_records` (sinh cột **từ FIELD_CATALOG** bằng script, không gõ tay) + index | M | khớp DATABASE_SCHEMA §3, §8 (đủ 82 field) |
-| M2-2 | Migration ops (số tiếp theo từ `0005`; tên `0002_ops` cũ không dùng vì 0002 đã là `import_prep`): status_history, interview_schedules, comments, tasks, hiring_checklists, targets, calendar_events, hr_info, hr_form_sends, record_files, translations, applications, saved_views, user_preferences, app_settings, audit_logs, rate_limits, import_batches | M | |
-| M2-3 | Hàm `app.*` nền (`is_admin`, `my_pic`, `can_see_record`) + RLS toàn bộ bảng + `revoke` quyền ghi trực tiếp vào `recruitment_records` | M | |
-| M2-4 | **Bộ test RLS** (pgTAP hoặc script): ≥3 PIC + Admin + anon, mọi bảng × mọi thao tác (DATABASE_SCHEMA §5) | M | 100% đạt; CI chặn merge nếu fail |
-| M2-5 | Seed: pics, dropdown, hierarchy, sub_source, settings (từ `seedData.ts`) | S | |
-| M2-6 | RPC ghi: `save_record`, `create_record`, `next_candidate_code` (advisory lock theo PIC), trigger `status_history`/`audit_logs` | L | test đồng thời: 20 phiên tạo mã cùng PIC không trùng |
-| M2-8 | Quyền xem target (TARGET, G1): `profiles.can_view_all_targets`, `public.can_view_target(pic)`, policy `targets` theo DATABASE_SCHEMA §5; cấp quyền `service_role` cho mọi bảng mới | S | test RLS: TA thường chỉ thấy target của mình, TA được bật thấy tất cả |
+| M2-2 | **19/11: `0005_ops_tables` đã áp DEV (17 bảng).** Migration ops (số tiếp theo từ `0005`; tên `0002_ops` cũ không dùng vì 0002 đã là `import_prep`): status_history, interview_schedules, comments, tasks, hiring_checklists, targets, calendar_events, hr_info, hr_form_sends, record_files, translations, applications, saved_views, user_preferences, app_settings, audit_logs, rate_limits, import_batches | M | |
+| M2-3 | Hàm `app.*` nền (`is_admin`, `my_pic`, `can_see_record`) + RLS toàn bộ bảng + `revoke` quyền ghi trực tiếp vào `recruitment_records` | M | **19/11: đạt trên DEV – 26/26 bảng `public` bật RLS** |
+| M2-4 | **Bộ test RLS** (pgTAP hoặc script): ≥3 PIC + Admin + anon, mọi bảng × mọi thao tác (DATABASE_SCHEMA §5) | M | 100% đạt; CI chặn merge nếu fail – **19/11: `supabase/tests/rls_test.sql` (66 check, tự rollback) + job CI `db` (Postgres 17 trống: áp mọi migration rồi chạy test). Chờ kết quả CI** |
+| M2-5 | Seed: pics, dropdown, hierarchy, sub_source, settings (từ `seedData.ts`) | S | **19/11: `0006_seed_catalog` (sinh bởi `scripts/seed/gen_seed_catalog.mjs`) đã áp DEV: 32 PIC, 454 giá trị/41 danh sách, 34 sub_source, 50 phân cấp, 3 cấu hình** |
+| M2-6 | **Chờ chốt SECURITY DEFINER/INVOKER (DATABASE_SCHEMA nhật ký 1.1).** RPC ghi: `save_record`, `create_record`, `next_candidate_code` (advisory lock theo PIC), trigger `status_history`/`audit_logs` | L | test đồng thời: 20 phiên tạo mã cùng PIC không trùng |
+| M2-8 | **19/11: đã áp trong 0005.** Quyền xem target (TARGET, G1): `profiles.can_view_all_targets`, `public.can_view_target(pic)`, policy `targets` theo DATABASE_SCHEMA §5; cấp quyền `service_role` cho mọi bảng mới | S | test RLS: TA thường chỉ thấy target của mình, TA được bật thấy tất cả |
 | M2-7 | Kiểm kế hoạch thực thi (EXPLAIN) cho danh sách/lọc/tìm kiếm với 20.000 dòng seed | S | P95 truy vấn < 200 ms trên máy dev *(chưa đo)* |
 
 ## M3 – Auth và phân quyền
