@@ -92,6 +92,14 @@ jobs:
         run: |
           psql -v ON_ERROR_STOP=1 -f supabase/tests/rpc_test.sql 2>&1 | tee rpc.log
           grep -q "RPC_TEST_PASSED" rpc.log
+      - name: Test phân trang & lọc ứng viên (tự rollback)
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/candidate_list_test.sql 2>&1 | tee clist.log
+          grep -q "CANDIDATE_LIST_TEST_PASSED" clist.log
+      - name: SQL khớp logic hệ cũ trên golden fixture (rr_board_col/sub, rr_tenor)
+        run: |
+          psql -v ON_ERROR_STOP=1 -v fx="$(cat tests/golden/fixture.json)" -f supabase/tests/sql_parity_test.sql 2>&1 | tee parity.log
+          grep -q "SQL_PARITY_TEST_PASSED" parity.log
       - name: 20 phiên đồng thời tạo mã cùng PIC không trùng
         run: bash supabase/tests/concurrency_codes.sh
 

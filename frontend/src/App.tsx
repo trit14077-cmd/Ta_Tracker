@@ -11,6 +11,8 @@ import logoUrl from './assets/the-supra-logo.png';
 import { authService, type UserProfile } from './services/authService.ts';
 import { configError } from './lib/supabase.ts';
 import { UserAdminView } from './components/UserAdminView.tsx';
+import { CandidateTableView } from './components/CandidateTableView.tsx';
+import { candidateService, type DropdownDataResponse } from './services/candidateService.ts';
 
 type NavTab = 'candidates' | 'tasks' | 'calendar' | 'targets' | 'import_excel' | 'reports' | 'follow_wd' | 'droplist' | 'audit' | 'users';
 
@@ -32,7 +34,7 @@ const TITLES: Record<NavTab, string> = {
   users: 'Quản trị Tài khoản Người dùng',
 };
 // Màn hình đã chuyển sang hệ mới. Các mục khác hiện mờ cho tới khi chuyển xong (IMPLEMENTATION_TASKS M4–M7).
-const READY: NavTab[] = ['users'];
+const READY: NavTab[] = ['users', 'candidates'];
 
 export default function App() {
   const [sidebarW, setSidebarW] = useState<number>(() => {
@@ -77,6 +79,25 @@ export default function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [authChecking, setAuthChecking] = useState<boolean>(true);
   const [startupError, setStartupError] = useState<string>('');
+
+  const [dropdowns, setDropdowns] = useState<DropdownDataResponse>({
+    lists: {},
+    pics: [],
+    subSourceMapping: {},
+    regionToLocations: {},
+    locationToSites: {},
+  });
+  const loadDropdowns = async () => {
+    try {
+      const dd = await candidateService.getDropdowns();
+      setDropdowns(dd);
+    } catch {
+      // fallback
+    }
+  };
+  useEffect(() => {
+    if (user) loadDropdowns();
+  }, [user]);
 
   // Login form state
   const [loginUsername, setLoginUsername] = useState<string>('');
@@ -385,6 +406,13 @@ export default function App() {
         <main className="flex-1 p-6 overflow-y-auto">
           {activeTab === 'users' && user.role === 'admin' ? (
             <UserAdminView currentUserId={user.id} />
+          ) : activeTab === 'candidates' ? (
+            <CandidateTableView
+              user={user}
+              dropdowns={dropdowns}
+              globalSearch=""
+              onRefreshDropdowns={loadDropdowns}
+            />
           ) : (
             <div className="bg-white border border-slate-200 rounded-lg p-8 text-center text-xs text-slate-600 space-y-2">
               <Construction className="w-8 h-8 text-slate-400 mx-auto" />

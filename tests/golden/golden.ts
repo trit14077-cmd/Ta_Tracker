@@ -5,6 +5,7 @@ import { totals, rates, retention, groupTotals, trend, type ReportRow } from '..
 import { boardPosition, boardSub, lockedFieldKeys } from '../../shared/pipelineRules.ts';
 import { currentStage } from '../../shared/stage.ts';
 import { REASON_RULES } from '../../shared/reasonRules.ts';
+import { computeTenor } from '../../shared/validation.ts';
 
 export const TODAY = '2026-11-19';
 export const RANGES: Record<string, [string, string]> = {
@@ -109,6 +110,7 @@ export function computeOutputs(recs: Rec[]) {
     board: boardPosition(c),
     sub: boardSub(c),
     locked: lockedFieldKeys(c).length,
+    tenor: computeTenor(c.ob_date, c.emp_status, c.attrition_date, TODAY),
   }));
   const byRange = Object.fromEntries(
     Object.entries(RANGES).map(([k, [f, t]]) => {
