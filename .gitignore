@@ -1,13 +1,34 @@
-node_modules/
-build/
-dist/
-coverage/
-data/
-*.sqlite
-*.sqlite-shm
-*.sqlite-wal
-.DS_Store
-*.log
+# Gốc repo là thư mục NEW/ (OLD/ và Master.xlsx nằm ngoài repo).
+# Chép từ D:\Ta_Tracker-main\.gitignore, giữ đồng bộ nếu sửa.
+
+# Bí mật
 .env
 .env.*
 !.env.example
+*.pem
+*service-account*.json
+*credentials*.json
+
+# Dữ liệu thật / đầu ra ETL
+Master.xlsx
+*.xlsx
+*.xls
+*.csv
+etl-out/
+scripts/out/
+*.dump
+*.gpg
+*.sql.gpg
+
+# Build / phụ thuộc
+node_modules/
+dist/
+.vite/
+supabase/.temp/
+supabase/.branches/
+__pycache__/
+.DS_Store
+
+# Python / công cụ
+.venv/
+*.pyc

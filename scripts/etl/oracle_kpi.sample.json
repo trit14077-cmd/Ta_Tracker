@@ -1,0 +1,19 @@
+{
+ "total": 9829,
+ "r1_passed": 5106,
+ "r1_failed": 3013,
+ "r2_passed": 1658,
+ "ob_joined": 1058,
+ "emp_active": 554,
+ "emp_resigned": 509,
+ "distinct_pic": 30,
+ "exceptions": {
+  "GHI_CHU_CAT_O_COT_R1": 7,
+  "MA_SAI_DINH_DANG": 4,
+  "MA_TRUNG": 41,
+  "SDT_SAI_DO_DAI": 34,
+  "THIEU_MA": 1,
+  "THIEU_REGION": 69,
+  "THIEU_SDT": 812
+ }
+}

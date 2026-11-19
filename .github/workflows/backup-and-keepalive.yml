@@ -1,0 +1,130 @@
+# M0-7 / M9-5 / M9-6 – giữ Supabase Free không bị pause + pg_dump hằng ngày + THỬ RESTORE mỗi lần chạy.
+#
+# Secrets (GitHub > Settings > Secrets and variables > Actions; KHÔNG dán vào chat/Git):
+#   Bắt buộc
+#     SUPABASE_DB_URL     chuỗi kết nối SESSION POOLER (cổng 5432, host aws-*.pooler.supabase.com,
+#                         user postgres.<project-ref>). Không dùng "Direct connection" (chỉ IPv6, runner GitHub
+#                         không vào được) và không dùng transaction pooler cổng 6543 (pg_dump không chạy ổn).
+#     BACKUP_PASSPHRASE   mật khẩu mã hóa file dump – cất riêng ngoài GitHub; mất là không giải mã được.
+#   Tùy chọn (thiếu thì bỏ qua bước đó, không làm fail)
+#     GDRIVE_SA_JSON, GDRIVE_FOLDER_ID   đẩy bản mã hóa lên Drive (xem lưu ý service account ở báo cáo M0-7)
+#     ALERT_TELEGRAM_BOT_TOKEN, ALERT_TELEGRAM_CHAT_ID   nhắn khi fail (GitHub vẫn gửi email khi workflow fail)
+#
+# Không in dữ liệu ra log: chỉ in số dòng theo bảng.
+name: backup-and-keepalive
+on:
+  schedule:
+    - cron: "17 19 * * *"   # 19:17 UTC = 02:17 giờ VN hằng ngày
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  group: backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      restore:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: restorecheck
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      GDRIVE_SA_JSON: ${{ secrets.GDRIVE_SA_JSON }}
+      GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+      TG_TOKEN: ${{ secrets.ALERT_TELEGRAM_BOT_TOKEN }}
+      TG_CHAT: ${{ secrets.ALERT_TELEGRAM_CHAT_ID }}
+      # DB thử restore (container tạm, mật khẩu không bí mật). SUPABASE_DB_URL có mật khẩu riêng nên không bị PGPASSWORD ảnh hưởng.
+      RESTORE_URL: postgresql://postgres@localhost:5432/postgres
+      PGPASSWORD: restorecheck
+      COUNT_SQL: >-
+        select 'recruitment_records', count(*) from public.recruitment_records
+        union all select 'pics', count(*) from public.pics
+        union all select 'import_batches', count(*) from public.import_batches
+        union all select 'profiles', count(*) from public.profiles
+        order by 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Kiểm tra secrets bắt buộc
+        run: |
+          for v in SUPABASE_DB_URL BACKUP_PASSPHRASE; do
+            if [ -z "${!v}" ]; then echo "::error::Thiếu secret $v"; exit 1; fi
+          done
+
+      - name: Cài postgresql-client 17 (khớp Postgres 17 của Supabase)
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+          echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
+
+      - name: Giữ hoạt động + đếm số dòng nguồn
+        run: |
+          pg_dump --version
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -AtF ' ' -c "$COUNT_SQL" > src_counts.txt
+          echo "Số dòng nguồn:"; cat src_counts.txt
+
+      - name: pg_dump (schema public + app)
+        run: |
+          f="supra_$(date -u +%Y%m%d_%H%M).dump"
+          pg_dump "$SUPABASE_DB_URL" -Fc --no-owner --no-acl --schema=public --schema=app -f "$f"
+          ls -l "$f"
+          echo "DUMP=$f" >> "$GITHUB_ENV"
+          # Không gồm schema auth (tài khoản đăng nhập): tạo lại bằng Edge admin-users (MIGRATION_PLAN §7).
+
+      - name: Thử restore vào Postgres trống và đối chiếu số dòng
+        run: |
+          psql "$RESTORE_URL" -v ON_ERROR_STOP=1 -q -f scripts/ops/restore-stubs.sql
+          pg_restore -d "$RESTORE_URL" --no-owner --no-acl "$DUMP" 2> restore.log || true
+          # Chỉ chấp nhận lỗi 'schema "public" already exists' (DB trống luôn có sẵn schema public)
+          if grep -E "ERROR:" restore.log | grep -vq 'schema "public" already exists'; then
+            echo "::error::pg_restore có lỗi:"; grep -E "ERROR:" restore.log | grep -v 'schema "public" already exists' | head -20
+            exit 1
+          fi
+          psql "$RESTORE_URL" -v ON_ERROR_STOP=1 -AtF ' ' -c "$COUNT_SQL" > dst_counts.txt
+          echo "Số dòng sau restore:"; cat dst_counts.txt
+          diff src_counts.txt dst_counts.txt && echo "Restore khớp số dòng."
+
+      - name: Mã hóa (AES256)
+        run: |
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" \
+            --symmetric --cipher-algo AES256 -o "$DUMP.gpg" "$DUMP"
+          rm -f "$DUMP" restore.log
+          ls -l "$DUMP.gpg"
+
+      - name: Đẩy lên Google Drive, giữ 30 bản
+        if: env.GDRIVE_SA_JSON != '' && env.GDRIVE_FOLDER_ID != ''
+        run: |
+          sudo apt-get install -y -qq rclone
+          umask 077; printf '%s' "$GDRIVE_SA_JSON" > sa.json
+          rclone config create gd drive scope drive service_account_file sa.json root_folder_id "$GDRIVE_FOLDER_ID" >/dev/null
+          rclone copy "$DUMP.gpg" gd:db-backups
+          rclone lsf gd:db-backups --include "*.gpg" | sort | head -n -30 | xargs -r -I{} rclone deletefile "gd:db-backups/{}"
+          rm -f sa.json
+
+      - name: Chưa cấu hình Drive – lưu tạm bản mã hóa làm artifact 7 ngày
+        if: env.GDRIVE_SA_JSON == '' || env.GDRIVE_FOLDER_ID == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.DUMP }}.gpg
+          path: ${{ env.DUMP }}.gpg
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Cảnh báo Telegram khi lỗi
+        if: failure() && env.TG_TOKEN != '' && env.TG_CHAT != ''
+        run: |
+          curl -s "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode chat_id="$TG_CHAT" \
+            --data-urlencode text="TA Tracker: backup/keep-alive FAIL - ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >/dev/null
