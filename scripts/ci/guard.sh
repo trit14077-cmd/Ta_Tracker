@@ -11,7 +11,7 @@ fail=0
 # 1) File bị cấm theo tên/đuôi
 for f in "${files[@]}"; do
   case "$f" in
-    .env.example) ;;
+    .env.example|*/.env.example) ;;
     .env|.env.*|*/.env|*/.env.*|*.pem|*.key|*.p12|*.dump|*.gpg|*.sql.gz|*.csv|*.xlsx|*.xls|*service-account*.json|*credentials*.json|etl-out/*|scripts/out/*)
       echo "CẤM: file không được vào Git: $f"; fail=1 ;;
   esac

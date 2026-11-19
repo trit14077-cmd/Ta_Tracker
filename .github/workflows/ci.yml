@@ -25,10 +25,17 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run test
+      - name: Build frontend (typecheck strict + vite build)
+        run: |
+          npm ci --prefix frontend
+          npm run build --prefix frontend
 
   edge:
     name: Kiểm kiểu Edge Functions (Deno)

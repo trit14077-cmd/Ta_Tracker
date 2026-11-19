@@ -63,9 +63,9 @@ Kích cỡ: S ≤ nửa ngày, M ≈ 1–2 ngày, L ≈ 3–5 ngày công của 
 
 | ID | Việc | Cỡ | Hoàn thành khi |
 |---|---|---|---|
-| M3-1 | Trang đăng nhập (username → email giả), đổi mật khẩu, đăng xuất, tự làm mới phiên | M | |
+| M3-1 | Trang đăng nhập (username → email giả), đổi mật khẩu, đăng xuất, tự làm mới phiên | M | **19/11: `frontend/` (React 19 + Vite 8 + Tailwind 4 + supabase-js), chuyển từ OLD/src/App.tsx (đăng nhập, khung menu, đổi MK), i18n VI/EN chép nguyên. Đổi MK kiểm mật khẩu hiện tại như hệ cũ. Build + typecheck trong CI. PO xác nhận đăng nhập chạy được trên máy (19/11)** |
 | M3-2 | Edge `admin-users` (tạo/sửa/khóa/đặt lại MK, bật/tắt `can_view_all_targets`) | M | `pic` bắt buộc `pic_code` (`MISSING_PIC`) – **19/11: đã deploy DEV (v1, verify_jwt).** Phần kiểm tra tách `logic.ts` (18 test Vitest), `deno check` trong CI; thử trên DEV: không JWT / JWT anon ⇒ 401. Khóa tài khoản = `profiles.active=false` + ban Auth; Admin không tự khóa/tự hạ quyền mình; audit không chứa mật khẩu. Admin đầu tiên tạo bằng `scripts/ops/bootstrap_admin.py` (PO tự chạy, chỉ chạy được khi chưa có Admin). Còn: PO tắt đăng ký tự do trong Auth, đặt secret `ALLOWED_ORIGINS` khi có domain frontend |
-| M3-3 | Màn hình Quản lý người dùng (`UserAdminView`) | M | |
+| M3-3 | Màn hình Quản lý người dùng (`UserAdminView`) | M | **19/11: chuyển từ OLD (giữ bố cục/chữ), thêm cột "Xem mọi target", bỏ cột ID/workspace, chặn tự khóa. Build đạt; **chưa thử thao tác tạo/sửa/khóa qua giao diện** (DEV 19/11: chưa có audit USER_UPDATE/RESET)** |
 | M3-4 | Thử nạp bcrypt hash vào `auth.users` trên dev (bước thử trong D-05b; không được thì cấp mật khẩu tạm + bắt đổi) và ghi kết quả vào MIGRATION_PLAN | S | quyết định đúng/sai bằng thực nghiệm |
 
 ## M4 – Ứng viên (đọc) và Edge `records-save`
