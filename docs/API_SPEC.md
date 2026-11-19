@@ -147,7 +147,7 @@ Mọi function: kiểm JWT → nạp `profiles` → kiểm `active` → xử lý
 { "op":"archive", "id": 456, "expected_version": 7 }
 ```
 
-Xử lý `patch`: (1) đọc hồ sơ bằng JWT người gọi (RLS ⇒ 404 nếu không có quyền); (2) `lockedFieldKeys` ⇒ `FIELD_LOCKED` nếu đụng field bị khóa; (3) `validateAndComputeCandidate` với cấu hình drop-list/hierarchy hiện hành ⇒ `VALIDATION_FAILED`; (4) gọi `public.save_record` một giao dịch; (5) trả `{ record, warnings, duplicates:{phone,cccd} }`.
+Xử lý `patch`: (1) đọc hồ sơ bằng JWT người gọi (RLS ⇒ 404 nếu không có quyền); (2) `lockedFieldKeys` ⇒ `FIELD_LOCKED` nếu đụng field bị khóa; (3) `validateAndComputeCandidate` với cấu hình drop-list/hierarchy hiện hành ⇒ `VALIDATION_FAILED`; (4) gọi `public.save_record(p_actor = id từ JWT, …)` một giao dịch bằng **service_role** (RPC ghi không cấp cho authenticated; lỗi RPC: `PT404` NOT_FOUND, `PT409` VERSION_CONFLICT/DUPLICATE_CODE, `PT403` FORBIDDEN, `PT422` INVALID_FIELD/INVALID_OP); (5) trả `{ record, warnings, duplicates:{phone,cccd} }`.
 Phản hồi `409`: `{error:{code:"VERSION_CONFLICT", details:{ current: <record> }}}` để UI hiện `ConflictResolutionModal`.
 Quyền: Admin mọi hồ sơ; TA chỉ hồ sơ `pic = pic_code` của mình; chỉ Admin được đổi `pic`, `reopen_hire`, mở lại hồ sơ đã khóa.
 Hiệu năng mục tiêu: P95 phản hồi server < 1 s (tiêu chí Kanban < 1 s ở UI nhờ optimistic update).
@@ -204,3 +204,4 @@ Trong 2 tuần chạy song song: hệ cũ **chỉ đọc**; chỉ một hệ đ�
 |---|---|---|
 | 0.1 | 19/11/2026 | Bản nháp đầu |
 | 1.0 | 19/11/2026 | Duyệt G1. Đổi mọi RPC `app.*` gọi từ app sang `public.*` (giữ `app.is_admin/my_pic/can_see_record`); bỏ route form riêng (D-09a); `targets` theo quyền TARGET; `can_see_record` nhận `pic`; ghi chú `report_totals` rút gọn ở 0003; `admin-users` thêm `can_view_all_targets`; CORS theo Cloudflare Pages (D-01) |
+| 1.1 | 19/11/2026 | `records-save` gọi `create_record`/`save_record` bằng service_role kèm `p_actor` (DATABASE_SCHEMA 1.2) |
