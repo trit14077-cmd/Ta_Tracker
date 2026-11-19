@@ -45,7 +45,7 @@ jobs:
       - uses: denoland/setup-deno@v2.0.5
         with:
           deno-version: v2.9.4
-      - run: deno check supabase/functions/*/index.ts
+      - run: deno check --node-modules-dir=none --no-lock supabase/functions/*/index.ts
 
   python:
     name: Kiểm cú pháp script ETL
