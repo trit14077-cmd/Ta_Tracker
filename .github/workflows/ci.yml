@@ -77,3 +77,38 @@ jobs:
           grep -q "RPC_TEST_PASSED" rpc.log
       - name: 20 phiên đồng thời tạo mã cùng PIC không trùng
         run: bash supabase/tests/concurrency_codes.sh
+
+  perf:
+    name: Hiệu năng truy vấn (20.000 hồ sơ giả)
+    runs-on: ubuntu-24.04
+    services:
+      pg:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: citest
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: citest
+      PGDATABASE: postgres
+    steps:
+      - uses: actions/checkout@v6
+      - name: Nền Supabase + migrations
+        run: |
+          psql -v ON_ERROR_STOP=1 -q -f supabase/tests/ci_stubs.sql
+          for f in supabase/migrations/*.sql; do psql -v ON_ERROR_STOP=1 -q -f "$f"; done
+      - name: Sinh 20.000 hồ sơ giả
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/perf_seed.sql
+      - name: Đo truy vấn (ngưỡng 200 ms)
+        run: |
+          set +e
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/perf_test.sql 2>&1 | tee perf.log
+          code=${PIPESTATUS[0]}
+          { echo "### Hiệu năng truy vấn – 20.000 hồ sơ giả (ms, 5 lần đo)"; echo;
+            echo "A = policy hiện hành, B = rr_read viết lại (chỉ để so sánh)"; echo;
+            cat perf_summary.md 2>/dev/null; } >> "$GITHUB_STEP_SUMMARY"
+          exit $code
