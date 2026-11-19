@@ -105,8 +105,9 @@ begin
   exception when others then
     assert sqlerrm <> 'EXPECTED_DENY', 'T1 không ghi trực tiếp status_history';
   end; c := c + 1;
-  select count(*) into n from public.audit_logs where record_id = any(recs);
+  select count(*) into n from public.audit_logs where record_id = any(recs) and action = 'UPDATE';  -- trigger 0015 ghi thêm dòng TASK/INTERVIEW
   assert n = 1, 'T1 chỉ thấy audit của hồ sơ mình'; c := c + 1;
+  assert not exists (select 1 from public.audit_logs where record_id is not null and record_id <> all(recs[1:1]) and record_id = any(recs)), 'T1 không thấy nhật ký (kể cả do trigger) của hồ sơ người khác'; c := c + 1;
   begin
     insert into public.audit_logs (actor_username, actor_role, action) values ('x','admin','FAKE');
     raise exception 'EXPECTED_DENY';

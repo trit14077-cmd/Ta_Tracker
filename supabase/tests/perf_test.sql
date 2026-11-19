@@ -51,6 +51,10 @@ begin
       ('B2 board_page',                   'ta',    'select public.board_page(''{}'', '''')'),
       ('B3 board_page tìm tên',           'admin', 'select public.board_page(''{}'', ''văn'')'),
       ('B4 board_cards ô R1 trang 5',     'admin', 'select public.board_cards(''r1'', 120, ''{}'', '''')'),
+      -- M6-1: lịch (gộp ngày R1/R2/OB của mọi hồ sơ trong tháng), công việc
+      ('O1 calendar_range 1 tháng',       'admin', 'select public.calendar_range(''2026-10-01'', ''2026-10-31'', '''')'),
+      ('O2 calendar_range 1 tháng',       'ta',    'select public.calendar_range(''2026-10-01'', ''2026-10-31'', '''')'),
+      ('O3 list_tasks tất cả',            'admin', 'select public.list_tasks(''all'', null, ''2026-11-19'')'),
       ('CH bình luận của 1 hồ sơ',        'ta',    format('select * from public.comments where record_id = %s order by created_at', v_rec))
     ) v(label, who, sql)
   loop

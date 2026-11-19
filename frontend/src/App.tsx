@@ -16,6 +16,10 @@ import { OverviewDashboard } from './components/OverviewDashboard.tsx';
 import { FollowWdView } from './components/FollowWdView.tsx';
 import { KanbanBoardView } from './components/KanbanBoardView.tsx';
 import { CandidateFormView } from './components/CandidateFormView.tsx';
+import { CandidateDetailModal } from './components/CandidateDetailModal.tsx';
+import { TasksView } from './components/TasksView.tsx';
+import { CalendarView } from './components/CalendarView.tsx';
+import { TargetsView } from './components/TargetsView.tsx';
 import { candidateService, type CandidateRecord, type DropdownDataResponse } from './services/candidateService.ts';
 
 type NavTab = 'candidates' | 'tasks' | 'calendar' | 'targets' | 'import_excel' | 'reports' | 'follow_wd' | 'droplist' | 'audit' | 'users';
@@ -38,7 +42,7 @@ const TITLES: Record<NavTab, string> = {
   users: 'Quản trị Tài khoản Người dùng',
 };
 // Màn hình đã chuyển sang hệ mới. Các mục khác hiện mờ cho tới khi chuyển xong (IMPLEMENTATION_TASKS M4–M7).
-const READY: NavTab[] = ['users', 'candidates', 'reports', 'follow_wd'];
+const READY: NavTab[] = ['users', 'candidates', 'tasks', 'calendar', 'targets', 'reports', 'follow_wd'];
 
 export default function App() {
   const [sidebarW, setSidebarW] = useState<number>(() => {
@@ -141,6 +145,19 @@ export default function App() {
   const [kanbanKey, setKanbanKey] = useState(0);
   const [kanbanForm, setKanbanForm] = useState<CandidateRecord | null>(null);
   const [kanbanFormDirty, setKanbanFormDirty] = useState(false);
+  // Mở hồ sơ từ Công việc / Lịch (hệ cũ: openCandidateById): cửa sổ chi tiết, "Sửa" mở form, "Lưu trữ" như danh sách.
+  const [openDetail, setOpenDetail] = useState<CandidateRecord | null>(null);
+  const [openBusy, setOpenBusy] = useState(false);
+  const [openError, setOpenError] = useState('');
+  const openCandidateById = async (id: number) => {
+    if (!id) return;
+    try {
+      setOpenError('');
+      setOpenDetail(await candidateService.getCandidate(id));
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Không mở được hồ sơ.');
+    }
+  };
   const closeKanbanForm = () => {
     if (kanbanFormDirty && !window.confirm('Có thay đổi chưa lưu. Đóng cửa sổ và bỏ các thay đổi?')) return;
     setKanbanFormDirty(false);
@@ -490,26 +507,13 @@ export default function App() {
                   onRefreshDropdowns={loadDropdowns}
                 />
               )}
-              {kanbanForm && (
-                <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/60 p-3 sm:p-6 overflow-y-auto">
-                  <div className="relative w-full max-w-6xl bg-slate-50 rounded-lg shadow-xl border border-slate-200">
-                    <CandidateFormView
-                      user={user}
-                      dropdowns={dropdowns}
-                      editingCandidate={kanbanForm}
-                      onDirtyChange={setKanbanFormDirty}
-                      onSaved={() => {
-                        setKanbanFormDirty(false);
-                        setKanbanForm(null);
-                        setKanbanKey((k) => k + 1);
-                      }}
-                      onCancel={closeKanbanForm}
-                      onRefreshDropdowns={loadDropdowns}
-                    />
-                  </div>
-                </div>
-              )}
             </div>
+          ) : activeTab === 'tasks' ? (
+            <TasksView user={user} onOpenCandidate={openCandidateById} />
+          ) : activeTab === 'calendar' ? (
+            <CalendarView user={user} dropdowns={dropdowns} onOpenCandidate={openCandidateById} />
+          ) : activeTab === 'targets' ? (
+            <TargetsView user={user} dropdowns={dropdowns} />
           ) : activeTab === 'reports' ? (
             <OverviewDashboard user={user} />
           ) : activeTab === 'follow_wd' ? (
@@ -523,6 +527,58 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* Form sửa hồ sơ mở từ Kanban, Công việc, Lịch */}
+      {kanbanForm && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/60 p-3 sm:p-6 overflow-y-auto">
+          <div className="relative w-full max-w-6xl bg-slate-50 rounded-lg shadow-xl border border-slate-200">
+            <CandidateFormView
+              user={user}
+              dropdowns={dropdowns}
+              editingCandidate={kanbanForm}
+              onDirtyChange={setKanbanFormDirty}
+              onSaved={() => {
+                setKanbanFormDirty(false);
+                setKanbanForm(null);
+                setKanbanKey((k) => k + 1);
+              }}
+              onCancel={closeKanbanForm}
+              onRefreshDropdowns={loadDropdowns}
+            />
+          </div>
+        </div>
+      )}
+
+      {openDetail && (
+        <CandidateDetailModal
+          candidate={openDetail}
+          user={user}
+          canEdit={user.role === 'admin' || (Boolean(user.pic_code) && String(openDetail.pic) === user.pic_code)}
+          busy={openBusy}
+          error={openError}
+          onClose={() => setOpenDetail(null)}
+          onEdit={() => {
+            setKanbanForm(openDetail);
+            setOpenDetail(null);
+          }}
+          onDelete={async () => {
+            const restoring = Boolean(openDetail.is_archived);
+            if (!restoring && !window.confirm(`Xóa hồ sơ ${String(openDetail.candidate_code)} - ${String(openDetail.full_name)}?
+
+Hồ sơ được chuyển vào mục lưu trữ và biến khỏi danh sách.`)) return;
+            setOpenBusy(true);
+            setOpenError('');
+            try {
+              await candidateService.toggleArchiveCandidate(openDetail.id, !restoring, openDetail.row_version);
+              setOpenDetail(null);
+            } catch (e) {
+              setOpenError(e instanceof Error ? e.message : 'Không thể thực hiện thao tác.');
+            } finally {
+              setOpenBusy(false);
+            }
+          }}
+        />
+      )}
 
       {showPasswordModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">

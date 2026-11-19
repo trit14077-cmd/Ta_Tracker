@@ -10,6 +10,7 @@ import { CommentsPanel } from './CommentsPanel.tsx';
 import { StatusChip } from './StatusChip.tsx';
 import { CvBuilderModal } from './CvBuilderModal.tsx';
 import { HrInfoBanner } from './HrInfoBanner.tsx';
+import { CandidateOpsPanel } from './CandidateOpsPanel.tsx';
 import { requiredDocuments, visibleDocumentKeys } from '../../../shared/documentRules.ts';
 
 const STATUS_KEYS = new Set(['r1_status', 'r2_status', 'ob_status', 'emp_status']);
@@ -217,6 +218,8 @@ export const CandidateDetailModal: React.FC<Props> = ({
               </section>
             );
           })}
+          {/* M6-1: phỏng vấn, checklist tuyển, công việc của hồ sơ (như hệ cũ) */}
+          <CandidateOpsPanel candidate={candidate} user={user} canEdit={canEdit && !archived} />
           <CommentsPanel candidateId={Number(candidate.id)} user={user} />
         </div>
       </div>

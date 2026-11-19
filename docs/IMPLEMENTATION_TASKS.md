@@ -93,7 +93,7 @@ Kích cỡ: S ≤ nửa ngày, M ≈ 1–2 ngày, L ≈ 3–5 ngày công của 
 
 | ID | Việc | Cỡ | Hoàn thành khi |
 |---|---|---|---|
-| M6-1 | Tasks, Interviews, Calendar, Targets | L | |
+| M6-1 | Tasks, Interviews, Calendar, Targets | L | – **20/11: 0015 + chép TasksView, CalendarView, TargetsView, CandidateOpsPanel (lại vào cửa sổ chi tiết hồ sơ; xác nhận tuyển chờ M6-2); opsService giữ tên hàm dataService cũ. PO chốt 20/11 giữ như hệ cũ: TA sửa/xóa việc gắn hồ sơ PIC mình, chỉ người tạo/Admin xóa phỏng vấn, ghi nhật ký TASK/INTERVIEW/TARGET ngay (trigger). ops_test 44 check; lịch 1 tháng tại máy (20.000 hồ sơ) Admin ≤ 114 ms, TA ≤ 14 ms. Còn: CI, áp DEV, PO thử** |
 | M6-2 | Hiring checklist + Xác nhận tuyển (khóa/mở lại Admin) | M | |
 | M6-3 | Alerts (chuông) | S | |
 | M6-4 | HR Info: Edge `hr-info-save`, `hr-form`, banner (`HrInfoBanner`), trùng CCCD | L | |
