@@ -115,7 +115,7 @@ Kích cỡ: S ≤ nửa ngày, M ≈ 1–2 ngày, L ≈ 3–5 ngày công của 
 
 | ID | Việc | Cỡ | Hoàn thành khi |
 |---|---|---|---|
-| M8-0 | Thay dữ liệu thật trên DEV bằng bản ẩn danh (DEV-DATA a): bước ẩn danh trong ETL + xóa lô hiện tại + nạp lại, KPI vẫn khớp | S | DEV không còn tên/SĐT/email/địa chỉ/ngày sinh/mã NV/lương thật – **PO chọn làm sau** |
+| M8-0 | Thay dữ liệu thật trên DEV bằng bản ẩn danh (DEV-DATA a): bước ẩn danh trong ETL + xóa lô hiện tại + nạp lại, KPI vẫn khớp | S | DEV không còn tên/SĐT/email/địa chỉ/ngày sinh/mã NV/lương thật – **ĐẠT 19/11/2026**: `scripts/etl/anonymize_records.py` (HMAC khóa dùng 1 lần, ánh xạ một-một giữ nhóm trùng SĐT 709/709), nạp lô 4 thay lô thật 3; KPI 6/6 khớp; kiểm trên DEV: 0 SĐT/email/mã NV/ghi chú/lương thật. CSV chưa ẩn danh chỉ còn trong `etl-out/` trên máy PO |
 | M8-1 | Script ETL `scripts/migrate/` (trích xuất → staging → biến đổi → nạp), dùng `src/shared`; áp E1a, Q5a (không nạp dòng lỗi, xuất báo cáo). Bản Python `scripts/etl/` hiện có chỉ là diễn tập (MIGRATION_PLAN §2.1) | L | chạy lại 3 lần cùng kết quả |
 | M8-2 | Báo cáo ngoại lệ E1–E12 | M | |
 | M8-3 | Bộ đối chiếu (số dòng, hash cột, KPI, board, RLS) | M | |

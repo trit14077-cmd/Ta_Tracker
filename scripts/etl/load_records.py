@@ -238,7 +238,7 @@ def main():
     print(f'PIC: tạo {len(new_pics)}')
 
     _, b = api.ok('POST', '/import_batches', body={'source': BATCH_SOURCE, 'row_count': 0,
-                                                   'note': f'Master.xlsx full load; records.csv sha256 {sha}'},
+                                                   'note': f'Master.xlsx full load; {Path(a.csv).name} sha256 {sha}'},
                   prefer='return=representation')
     batch_id = b[0]['id']
     print(f'import_batch_id = {batch_id}')

@@ -36,7 +36,7 @@ Nguyên tắc: **không xóa dữ liệu cũ**; mọi bước có thể chạy l
 
 - Dùng `scripts/etl/master_to_records.py` (Python, đọc `Master.xlsx`) + `scripts/etl/load_records.py` (nạp qua PostgREST bằng `service_role`, lô 500, dọn theo `import_batch_id`, có `--dry-run`). Nạp 9.829/9.829 dòng, 0 lỗi; chạy lại 2 lần cùng kết quả; `public.report_totals()` khớp oracle 6/6 chỉ số.
 - **Khác với quy trình chính thức ở §4–§5, chỉ có giá trị diễn tập:** dùng Master thật chưa ẩn danh; ETL viết bằng Python, chưa dùng `src/shared` (`applyLegacyImportTransformations`, validate); E1 tự cấp mã `IT#####` (trái E1a); nạp cả dòng E3–E5 (trái Q5a); `created_at` chỉ có ngày, lưu 00:00 UTC; 1 dòng thiếu `created_at` nhận `now()`.
-- **Việc còn treo (DEV-DATA a, PO chọn làm sau):** xóa lô dữ liệu thật trên DEV và nạp lại bằng bản đã ẩn thông tin cá nhân (tên, SĐT, email, địa chỉ, ngày sinh, mã NV, lương, ghi chú tự do), giữ nguyên các cột trạng thái để KPI vẫn đối chiếu được.
+- **ĐÃ LÀM 19/11/2026 (M8-0):** DEV đã thay bằng bản ẩn danh (lô 4). Mô tả gốc của việc: xóa lô dữ liệu thật trên DEV và nạp lại bằng bản đã ẩn thông tin cá nhân (tên, SĐT, email, địa chỉ, ngày sinh, mã NV, lương, ghi chú tự do), giữ nguyên các cột trạng thái để KPI vẫn đối chiếu được.
 
 ## 3. Chuẩn bị trước khi trích xuất
 
