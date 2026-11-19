@@ -97,36 +97,47 @@ begin
     perform public.save_record(t1, id1, 2, '{"candidate_code":"DOI"}');
     raise exception 'EXPECTED_ERR';
   exception when others then
-    assert sqlstate = 'PT422', 'Không đổi mã ứng viên qua save_record (422)'; end; c := c + 1;
+    assert sqlstate = 'PT403', 'TA không đổi được mã ứng viên (0009: chỉ Admin)'; end; c := c + 1;
+  j := public.save_record(t1, id1, 2, '{"candidate_code":"TA10001","r1_note":"giu ma"}');
+  assert j ->> 'candidate_code' = 'TA10001' and (j ->> 'row_version')::int = 3, 'TA gửi lại đúng mã cũ thì không bị chặn'; c := c + 1;
+  j := public.save_record(t1, id1, 3, '{"r1_note":""}');   -- version 4
 
-  j := public.save_record(t1, id1, 2, '{"r1_status":"Passed"}');
-  assert (j ->> 'row_version')::int = 2, 'Lưu không đổi gì: không tăng version'; c := c + 1;
+  j := public.save_record(t1, id1, 4, '{"r1_status":"Passed"}');
+  assert (j ->> 'row_version')::int = 4, 'Lưu không đổi gì: không tăng version'; c := c + 1;
 
-  j := public.save_record(t1, id1, 2, '{"r2_status":"Pending"}', '{"op":"move","from_box":"lusu","to_box":"r2"}');
-  assert (j ->> 'row_version')::int = 3, 'Kéo Kanban tăng version'; c := c + 1;
+  j := public.save_record(t1, id1, 4, '{"r2_status":"Pending"}', '{"op":"move","from_box":"lusu","to_box":"r2"}');
+  assert (j ->> 'row_version')::int = 5, 'Kéo Kanban tăng version'; c := c + 1;
   select count(*) into n from public.status_history where record_id = id1 and kind = 'STAGE_MOVE' and from_box = 'lusu' and to_box = 'r2';
   assert n = 1, 'Kéo Kanban ghi STAGE_MOVE với ô cũ/ô mới'; c := c + 1;
   select count(*) into n from public.audit_logs where record_id = id1 and action = 'STAGE_MOVE';
   assert n = 1, 'Kéo Kanban ghi audit STAGE_MOVE'; c := c + 1;
 
+  j := public.save_record(t1, id1, 5, '{}', '{"op":"archive"}');
+  assert (j ->> 'is_archived')::boolean and (j ->> 'row_version')::int = 6, 'TA lưu trữ được hồ sơ của mình (0009, như hệ cũ)'; c := c + 1;
+  j := public.save_record(t1, id1, 6, '{}', '{"op":"restore"}');
+  assert not (j ->> 'is_archived')::boolean, 'TA khôi phục được hồ sơ của mình'; c := c + 1;
   begin
-    perform public.save_record(t1, id1, 3, '{}', '{"op":"archive"}');
+    perform public.save_record(a, id1, 7, '{"candidate_code":"X1"}');
     raise exception 'EXPECTED_ERR';
   exception when others then
-    assert sqlstate = 'PT403', 'TA không lưu trữ hồ sơ (chỉ Admin)'; end; c := c + 1;
-  j := public.save_record(a, id1, 3, '{"pic":"TA2-Hien"}');
+    assert sqlstate = 'PT409', 'Admin đổi sang mã đã có => DUPLICATE_CODE (409)'; end; c := c + 1;
+  j := public.save_record(a, id1, 7, '{"candidate_code":"TA1MOI"}');
+  assert j ->> 'candidate_code' = 'TA1MOI', 'Admin đổi được mã ứng viên'; c := c + 1;
+  select count(*) into n from public.audit_logs where record_id = id1 and changes ? 'candidate_code';
+  assert n = 1, 'Đổi mã ghi vào audit'; c := c + 1;
+  j := public.save_record(a, id1, 8, '{"pic":"TA2-Hien"}');
   assert j ->> 'pic' = 'TA2-Hien', 'Admin đổi được PIC'; c := c + 1;
   select count(*) into n from public.status_history where record_id = id1 and kind = 'PIC_CHANGE' and from_value = 'TA1-Phat' and to_value = 'TA2-Hien';
   assert n = 1, 'Đổi PIC ghi PIC_CHANGE'; c := c + 1;
   begin
-    perform public.save_record(t1, id1, 4, '{"r1_note":"sau khi chuyen"}');
+    perform public.save_record(t1, id1, 9, '{"r1_note":"sau khi chuyen"}');
     raise exception 'EXPECTED_ERR';
   exception when others then
     assert sqlstate = 'PT404', 'Sau khi đổi PIC, TA cũ mất quyền sửa (Q6)'; end; c := c + 1;
-  j := public.save_record(a, id1, 4, '{}', '{"op":"archive"}');
+  j := public.save_record(a, id1, 9, '{}', '{"op":"archive"}');
   assert (j ->> 'is_archived')::boolean, 'Admin lưu trữ hồ sơ'; c := c + 1;
   begin
-    perform public.save_record(a, id1, 5, '{}', '{"op":"xoa"}');
+    perform public.save_record(a, id1, 10, '{}', '{"op":"xoa"}');
     raise exception 'EXPECTED_ERR';
   exception when others then
     assert sqlstate = 'PT422', 'Thao tác lạ bị từ chối'; end; c := c + 1;
@@ -136,7 +147,7 @@ begin
   execute 'set local role authenticated';
   perform set_config('request.jwt.claims', json_build_object('sub', t1, 'role', 'authenticated')::text, true);
   begin
-    perform public.save_record(t1, id1, 5, '{"r1_note":"goi thang"}');
+    perform public.save_record(t1, id1, 10, '{"r1_note":"goi thang"}');
     raise exception 'EXPECTED_ERR';
   exception when others then
     assert sqlstate = '42501', 'Người dùng không gọi thẳng save_record được (bỏ qua validate của Edge)'; end; c := c + 1;
