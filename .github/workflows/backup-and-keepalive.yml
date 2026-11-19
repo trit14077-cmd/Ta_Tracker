@@ -51,7 +51,7 @@ jobs:
         union all select 'profiles', count(*) from public.profiles
         order by 1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Kiểm tra secrets bắt buộc
         run: |
@@ -115,7 +115,7 @@ jobs:
 
       - name: Chưa cấu hình Drive – lưu tạm bản mã hóa làm artifact 7 ngày
         if: env.GDRIVE_SA_JSON == '' || env.GDRIVE_FOLDER_ID == ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ env.DUMP }}.gpg
           path: ${{ env.DUMP }}.gpg

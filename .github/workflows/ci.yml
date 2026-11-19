@@ -13,15 +13,15 @@ jobs:
     name: Chặn bí mật / dữ liệu thật
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: bash scripts/ci/guard.sh
 
   node:
     name: Typecheck, lint, test
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -34,8 +34,8 @@ jobs:
     name: Kiểm cú pháp script ETL
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: python -m py_compile scripts/etl/*.py
