@@ -36,6 +36,15 @@ begin
       ('S4 tìm theo SĐT',                 'ta',    format('select %s from public.recruitment_records where phone = %L', cols, v_phone)),
       ('K1 report_totals()',              'admin', 'select * from public.report_totals()'),
       ('K2 report_totals()',              'ta',    'select * from public.report_totals()'),
+      -- M5-1: RPC báo cáo (trang Báo cáo gọi ~6 hàm này song song)
+      ('R1 report_totals YTD',            'admin', 'select public.report_totals(''2026-01-01'', ''2026-11-19'', ''{}'', ''none'', ''2026-11-19'')'),
+      ('R2 report_totals YTD',            'ta',    'select public.report_totals(''2026-01-01'', ''2026-11-19'', ''{}'', ''none'', ''2026-11-19'')'),
+      ('R3 report_totals theo PIC',       'admin', 'select public.report_totals(''2025-01-01'', ''2026-11-19'', ''{}'', ''pic'', ''2026-11-19'')'),
+      ('R4 report_series 12 tháng',       'admin', 'select public.report_series((select jsonb_agg(jsonb_build_array(d::date, (d + interval ''1 month - 1 day'')::date)) from generate_series(''2025-12-01''::timestamp, ''2026-11-01'', ''1 month'') d), ''{}'', ''2026-11-19'')'),
+      ('R5 report_sources 12 tuần',       'admin', 'select public.report_sources((select jsonb_agg(jsonb_build_array(d::date, (d + interval ''6 day'')::date)) from generate_series(''2026-08-31''::timestamp, ''2026-11-16'', ''7 day'') d), ''{}'', ''2026-11-19'')'),
+      ('R6 report_trend 2 năm',           'ta',    'select public.report_trend(''2025-01-01'', ''2026-11-19'', ''{}'')'),
+      ('R7 report_reasons YTD',           'admin', 'select public.report_reasons(''2026-01-01'', ''2026-11-19'', ''{}'')'),
+      ('R8 report_meta',                  'admin', 'select public.report_meta(''2026-11-19'')'),
       ('CH bình luận của 1 hồ sơ',        'ta',    format('select * from public.comments where record_id = %s order by created_at', v_rec))
     ) v(label, who, sql)
   loop

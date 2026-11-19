@@ -83,7 +83,7 @@ Kích cỡ: S ≤ nửa ngày, M ≈ 1–2 ngày, L ≈ 3–5 ngày công của 
 
 | ID | Việc | Cỡ | Hoàn thành khi |
 |---|---|---|---|
-| M5-1 | RPC `report_totals/trend/sources/detail` | L | **0 sai lệch** so với `dashboardCalc.ts` trên golden fixtures + dữ liệu seed lớn |
+| M5-1 | RPC `report_totals/trend/sources/detail` | L | **0 sai lệch** so với `dashboardCalc.ts` trên golden fixtures + dữ liệu seed lớn – **19/11: 0011 (report_totals/series/trend/sources/reasons/meta). Golden thêm lý do rớt, theo nhóm, theo kỳ tháng/tuần, theo nguồn, có lọc + 10 ca biên viết tay (410 hồ sơ); lead = R1 date hoặc ngày tạo như hReportRows_. report_parity_test 104 check đạt tại máy (Postgres 17), thử 12 lỗi cố ý: 11 bị bắt (1 là kiểm thừa). Tốc độ tại máy (20.000 hồ sơ, EXPLAIN): 7–141 ms. `report_detail` dời sang M5-3. Còn: CI xanh, áp DEV, so số DEV với hệ cũ** |
 | M5-2 | RPC `board_counts/board_cards` + `target_actual` + `alerts` + `calendar_range` | L | khớp `pipelineRules`/`opsRules` |
 | M5-3 | Dashboard/Overview/TaCharts/FollowWD dùng RPC (không tải dòng thô) | L | tiêu chí Dashboard P95 < 3 s |
 | M5-4 | Kanban (`KanbanBoardView`): tải 30 thẻ/cột + "Tải thêm", kéo thả, optimistic UI, xác nhận lưu server riêng | L | Kanban P95 phản hồi UI < 1 s |

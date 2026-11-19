@@ -113,9 +113,12 @@ Tất cả `SECURITY INVOKER` (trừ `check_*`), nhận tham số `jsonb`, trả
 
 | RPC | Tham số | Trả về |
 |---|---|---|
-| `public.report_totals(p_from date, p_to date, p_filters jsonb, p_group_by text)` – bản rút gọn 6 chỉ số `(p_from, p_to)` đã có ở 0003 để đối chiếu nạp dữ liệu; bản đủ làm ở M5-1 bằng migration mới | `filters`: pic, position, rank, region, location, site, dept, source; `group_by` ∈ none/pic/position/region/dept/source/month | `Totals` đúng các khóa của `dashboardCalc.Totals` (leads, r1Total, r1, lu, su, r2, ob, ns, cc, er, att, att30, er30n/d, er60n/d), theo nhóm |
-| `public.report_trend(p_from, p_to, p_filters)` | | `TrendPoint[]` (month, ob, att, start, churn) |
-| `public.report_sources(p_from, p_to, p_gran, p_filters)` | | `SourcePeriod[]` |
+| `public.report_totals(p_from, p_to, p_filters, p_group_by, p_today=null)` – 0011 (bản rút gọn `(p_from, p_to)` của 0003 giữ để đối chiếu nạp dữ liệu) | `filters`: pic, site, source, sub_source, region, dept, position, rank, location (so khớp đúng, rỗng = bỏ qua); `group_by` ∈ none/pic/site/source/sub_source/position/region/dept | none: `Totals` đúng khóa `dashboardCalc.Totals`; nhóm: `[[tên, Totals], …]` = `groupTotals` |
+| `public.report_series(p_periods, p_filters, p_today=null)` – 0011 | `p_periods` = `[[from, to], …]` do client tạo bằng `periodsOf` (≤ 60 kỳ, tổng ≤ 20.000 ngày) | `Totals[]` cùng thứ tự = `periodSeries` (không kèm `p`) |
+| `public.report_trend(p_from, p_to, p_filters)` – 0011 | | `TrendPoint[]` (month, ob, att, start, churn) |
+| `public.report_sources(p_periods, p_filters, p_today=null)` – 0011 | như `report_series` | `SourcePeriod[]` không kèm `p` |
+| `public.report_reasons(p_from, p_to, p_filters)` – 0011 | | `{r1_fail, lu_no, no_show, r2_fail, ob_no}` – dữ liệu lý do của 5 biểu đồ tròn; client ghép với `Totals` thành `DonutData` |
+| `public.report_meta(p_today=null)` – 0011 | | `{today (giờ VN), min_date (= MIN_DATE), options:{pic, site, source, sub_source, region, dept, position}}` trên toàn bộ hồ sơ được xem |
 | `public.report_detail(p_from, p_to, p_filters, p_limit, p_cursor)` | | bảng chi tiết phân trang (thay `reports/rows`, `FollowWdView`, export) |
 | `public.board_counts(p_filters)` | | `{lead,r1,lusu,r2,ob}` + chỉ số phụ `BoardSub` |
 | `public.board_cards(p_col, p_filters, p_limit=30, p_cursor)` | | thẻ: id, candidate_code, full_name, phone, position, pic, site + `failedAt` |
@@ -206,3 +209,4 @@ Trong 2 tuần chạy song song: hệ cũ **chỉ đọc**; chỉ một hệ đ�
 | 1.0 | 19/11/2026 | Duyệt G1. Đổi mọi RPC `app.*` gọi từ app sang `public.*` (giữ `app.is_admin/my_pic/can_see_record`); bỏ route form riêng (D-09a); `targets` theo quyền TARGET; `can_see_record` nhận `pic`; ghi chú `report_totals` rút gọn ở 0003; `admin-users` thêm `can_view_all_targets`; CORS theo Cloudflare Pages (D-01) |
 | 1.1 | 19/11/2026 | `records-save` gọi `create_record`/`save_record` bằng service_role kèm `p_actor` (DATABASE_SCHEMA 1.2) |
 | 1.2 | 19/11/2026 | PO chốt khi đối chiếu hệ cũ: `archive`/`restore` – TA làm được với hồ sơ PIC mình (như hệ cũ), không chỉ Admin; đổi `candidate_code` khi `patch` – chỉ Admin, kiểm trùng (0009). Lỗi thêm: `STEP_LOCKED` 422 (sửa bước sau vòng rớt), `MOVE_*` 409 (kéo thả không hợp lệ), `FORBIDDEN_PIC` / `FORBIDDEN_PIC_CHANGE` 403. Phản hồi: `{record, notices, duplicates:{phone}}` (trùng SĐT của PIC khác bị che như hệ cũ) |
+| 1.3 | 19/11/2026 | M5-1 (0011): RPC báo cáo theo kỳ nhận danh sách kỳ `p_periods` do client tạo (dùng lại `periodsOf`/`usePeriods` của hệ cũ) thay vì `p_gran`; thêm `report_series`, `report_reasons`, `report_meta`; mọi hàm có `p_today` (mặc định hôm nay giờ VN) để test; lọc thêm `sub_source`, `site`. `report_detail` chuyển sang M5-3 (cùng FollowWdView) |

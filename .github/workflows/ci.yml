@@ -100,6 +100,10 @@ jobs:
         run: |
           psql -v ON_ERROR_STOP=1 -f supabase/tests/sql_parity_test.sql 2>&1 | tee parity.log
           grep -q "SQL_PARITY_TEST_PASSED" parity.log
+      - name: RPC báo cáo khớp dashboardCalc trên golden fixture (tự rollback)
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/report_parity_test.sql 2>&1 | tee report.log
+          grep -q "REPORT_PARITY_TEST_PASSED" report.log
       - name: 20 phiên đồng thời tạo mã cùng PIC không trùng
         run: bash supabase/tests/concurrency_codes.sh
 
