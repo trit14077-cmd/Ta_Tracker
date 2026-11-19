@@ -38,7 +38,7 @@ from g;
 
 insert into public.comments (record_id, author_id, author_username, author_role, body)
 select r.id, '00000000-0000-4000-8000-0000000003a0', 'perf_admin', 'admin', 'Ghi chú ' || r.id
-from public.recruitment_records r where r.id % 4 = 0;
+from public.recruitment_records r where r.id % 4 = 0 or r.id % 3 = 0 and r.pic = 'TA3-Thang';
 
 analyze;
 select (select count(*) from public.recruitment_records) records, (select count(*) from public.comments) comments,

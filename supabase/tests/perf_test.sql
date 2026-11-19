@@ -13,10 +13,14 @@ declare
   q record; i int; j json; t numeric; arr numeric[];
   v_admin uuid := '00000000-0000-4000-8000-0000000003a0';
   v_ta    uuid := '00000000-0000-4000-8000-0000000003b1';
-  v_rec bigint := (select min(id) from public.recruitment_records where pic = 'TA3-Thang' and id % 4 = 0);
+  v_rec bigint := (select min(c.record_id) from public.comments c join public.recruitment_records r on r.id = c.record_id
+                    where r.pic = 'TA3-Thang');
   v_phone text := (select phone from public.recruitment_records where pic = 'TA3-Thang' and phone <> '' order by id limit 1);
   cols text := 'id, candidate_code, full_name, phone, position, pic, site, r1_status, r2_status, ob_status, created_at';
 begin
+  if v_rec is null or v_phone is null then
+    raise exception 'Dữ liệu perf_seed thiếu: hồ sơ TA3 có bình luận = %, SĐT TA3 = %', v_rec, v_phone;
+  end if;
   for q in
     select * from (values
       ('L1 danh sách trang 1',            'admin', format('select %s from public.recruitment_records where not is_archived order by created_at desc limit 50', cols)),
