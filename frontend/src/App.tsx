@@ -21,6 +21,7 @@ import { TasksView } from './components/TasksView.tsx';
 import { CalendarView } from './components/CalendarView.tsx';
 import { TargetsView } from './components/TargetsView.tsx';
 import { AlertsBell } from './components/AlertsBell.tsx';
+import { AuditLogView } from './components/AuditLogView.tsx';
 import { candidateService, type CandidateRecord, type DropdownDataResponse } from './services/candidateService.ts';
 
 type NavTab = 'candidates' | 'tasks' | 'calendar' | 'targets' | 'import_excel' | 'reports' | 'follow_wd' | 'droplist' | 'audit' | 'users';
@@ -43,7 +44,7 @@ const TITLES: Record<NavTab, string> = {
   users: 'Quản trị Tài khoản Người dùng',
 };
 // Màn hình đã chuyển sang hệ mới. Các mục khác hiện mờ cho tới khi chuyển xong (IMPLEMENTATION_TASKS M4–M7).
-const READY: NavTab[] = ['users', 'candidates', 'tasks', 'calendar', 'targets', 'reports', 'follow_wd'];
+const READY: NavTab[] = ['users', 'candidates', 'tasks', 'calendar', 'targets', 'reports', 'follow_wd', 'audit'];
 
 export default function App() {
   const [sidebarW, setSidebarW] = useState<number>(() => {
@@ -517,6 +518,8 @@ export default function App() {
             <CalendarView user={user} dropdowns={dropdowns} onOpenCandidate={openCandidateById} />
           ) : activeTab === 'targets' ? (
             <TargetsView user={user} dropdowns={dropdowns} />
+          ) : activeTab === 'audit' ? (
+            <AuditLogView />
           ) : activeTab === 'reports' ? (
             <OverviewDashboard user={user} />
           ) : activeTab === 'follow_wd' ? (

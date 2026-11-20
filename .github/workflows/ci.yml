@@ -120,6 +120,10 @@ jobs:
         run: |
           psql -v ON_ERROR_STOP=1 -f supabase/tests/hr_test.sql 2>&1 | tee hr.log
           grep -q "HR_TEST_PASSED" hr.log
+      - name: Nhật ký (0019) – mỗi trường một dòng như hệ cũ, quyền xem (tự rollback)
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/audit_test.sql 2>&1 | tee audit.log
+          grep -q "AUDIT_TEST_PASSED" audit.log
       - name: 20 phiên đồng thời tạo mã cùng PIC không trùng
         run: bash supabase/tests/concurrency_codes.sh
 
