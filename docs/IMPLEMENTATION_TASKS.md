@@ -106,9 +106,9 @@ Kích cỡ: S ≤ nửa ngày, M ≈ 1–2 ngày, L ≈ 3–5 ngày công của 
 | M7-1 | Edge `files` (CV, 5 giấy tờ, Salary Proposal, Payslips) + kiểm quyền bằng `can_see_record` | L | TA `pic=null` **không** tải được file (lỗ hổng AUDIT §3.2 #1 đóng) |
 | M7-2 | Panel đính kèm/giấy tờ/CV Builder/Translation | M | |
 | M7-3 | Edge `apply-submit` + `apply-info` + trang tuyển dụng tĩnh + inbox (`ApplicationsInbox`) | L | chống spam đạt: SĐT 1 lần/10 phút, ≤120/giờ/link, honeypot |
-| M7-4 | Edge `records-import` + `ImportExcelView` | L | báo lỗi theo dòng; rollback theo lô |
-| M7-5 | Edge `export` (CSV/Sheets) + `sanitizeCellForSpreadsheet` | M | |
-| M7-6 | Admin: Drop-list, Views, cấu hình (ob-target, hr-form) | M | – **20/11: 0020 + chép DropdownAdminView (menu Drop-list, có danh mục PIC như hệ cũ), thẻ cấu hình form HR dưới trang Drop-list (màn Workspace đã bỏ – D-09), adminService/adminCatalog; ob-target đã có ở TaCharts (M5-3). View: hệ cũ không có mục menu nên giữ ẩn, chỉ có RPC. admin_test 32 check; admin-catalog.test 3 (mọi cột dùng Drop-list đều ghi được). Còn: CI, áp DEV, PO thử** |
+| M7-4 | Edge `records-import` + `ImportExcelView` | L | báo lỗi theo dòng; rollback theo lô – **20/11: 0021 + Edge records-import; chép nguyên gasImport.ts + ImportExcelView (menu Nhập Excel, chỉ Admin); SheetJS bản vá 0.20.3 (cdn.sheetjs.com) thay 0.18.5 có lỗ hổng. import_test 15, records-import.test 6. Rollback theo lô: chưa (hệ cũ không có), dữ liệu đã gắn import_batch_id. Còn: CI, áp DEV, deploy-dev, PO thử** |
+| M7-5 | Edge `export` (CSV/Sheets) + `sanitizeCellForSpreadsheet` | M | – **20/11: nút Xuất ở danh sách đổi từ CSV (M4) sang .xlsx như hệ cũ (TA_TRACKER_UngVien_<ngày>.xlsx, mọi cột fieldCatalog, tên cột Excel, chặn công thức), làm ở trình duyệt qua list_candidates – không cần Edge. Còn: PO thử** |
+| M7-6 | Admin: Drop-list, Views, cấu hình (ob-target, hr-form) | M | – **20/11: 0020 + chép DropdownAdminView (menu Drop-list, có danh mục PIC như hệ cũ), thẻ cấu hình form HR dưới trang Drop-list (màn Workspace đã bỏ – D-09), adminService/adminCatalog; ob-target đã có ở TaCharts (M5-3). View: hệ cũ không có mục menu nên giữ ẩn, chỉ có RPC. admin_test 32 check; admin-catalog.test 3 (mọi cột dùng Drop-list đều ghi được). CI xanh; **0020 đã áp DEV** (PO chạy bằng SQL Editor vì lệnh apply_migration bị chặn quyền – 7 hàm, quyền đúng, unique tên view; chưa có trong danh sách migration của Supabase, cần ghi bổ sung). Còn: PO thử** |
 | M7-7 | i18n Việt/Anh cho thông báo mới | S | |
 
 ## M8 – Migration (xem MIGRATION_PLAN.md)

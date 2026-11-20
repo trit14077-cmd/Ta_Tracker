@@ -128,6 +128,10 @@ jobs:
         run: |
           psql -v ON_ERROR_STOP=1 -f supabase/tests/admin_test.sql 2>&1 | tee admin.log
           grep -q "ADMIN_TEST_PASSED" admin.log
+      - name: Nhập Excel (0021) – không ghi đè, chỉ Admin, nhật ký từng dòng (tự rollback)
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/import_test.sql 2>&1 | tee import.log
+          grep -q "IMPORT_TEST_PASSED" import.log
       - name: 20 phiên đồng thời tạo mã cùng PIC không trùng
         run: bash supabase/tests/concurrency_codes.sh
 

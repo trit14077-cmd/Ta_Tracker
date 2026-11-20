@@ -9,6 +9,7 @@ import {
 } from '../../../shared/validation.ts';
 import { INITIAL_DROPDOWN_LISTS } from '../../../shared/seedData.ts';
 import { buildConfig } from '../../../supabase/functions/records-save/logic.ts';
+import { downloadXlsx } from './xlsxDownload.ts';
 import type { DupInfo } from '../../../shared/dup.ts';
 
 export interface CandidateRecord {
@@ -318,15 +319,11 @@ export const candidateService = {
       items.push(...res.items);
       if (page >= res.totalPages) break;
     }
-    const headers = FIELD_CATALOG.map((f) => f.excelHeader || f.label);
+    // = hệ cũ: file .xlsx, mọi cột theo fieldCatalog (tên cột Excel), giá trị như trên màn hình, chặn công thức (sanitize)
+    const headers = FIELD_CATALOG.map((f) => f.excelHeader);
     const rows = items.map((item) => FIELD_CATALOG.map((f) => sanitizeCellForSpreadsheet(item[f.key] ?? '')));
-    const csv = '﻿' + [headers, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `candidates_export_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const stamp = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+    await downloadXlsx(`TA_TRACKER_UngVien_${stamp}.xlsx`, [headers, ...rows], 'TA_Tracker_Candidates');
   },
 
   // ===== file CV / giấy tờ / đính kèm: Edge `files` + Google Drive (D-03) – M7-1 =====
