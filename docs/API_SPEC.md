@@ -181,11 +181,11 @@ Kiểm quyền **luôn** qua `app.can_see_record(pic)` (một hàm duy nhất, �
 
 ### 4.6 `hr-info-save`
 
-`{record_id, mode:"draft"|"submit"|"verify", data:{…}}`. Kiểm `hrEligible` (R2 Passed trở đi), `validateHrInfo`, trùng CCCD (cảnh báo qua `public.check_cccd`). `verify` chỉ Admin; `submitted` ⇒ khóa chỉnh sửa theo quy tắc hiện tại.
+`{record_id, mode:"draft"|"submit"|"verify", data:{…}}`. Kiểm `hrEligible` (R2 Passed trở đi), `validateHrInfo`, trùng CCCD (cảnh báo qua `public.check_cccd`). ~~`verify` chỉ Admin~~ (PO chốt 20/11/2026: giữ như hệ cũ – TA phụ trách và Admin đều xác nhận / mở lại); chỉ `verified` khóa sửa (như hệ cũ). Thực tế: `{op:"save", record_id, mode:"draft"|"submit", data}` · `{op:"verify", record_id, verified:bool}` → `{info}`; lỗi `NOT_ELIGIBLE` 400, `VALIDATION_FAILED` 400 (+fields), `LOCKED`/`NOT_VERIFIED`/`CHANGED` 409, `NO_HR_INFO` 404.
 
 ### 4.7 `hr-form`
 
-`{op:"link", record_id}` ghi `hr_form_sends` và trả link Google Form (tham số từ `app_settings.hr_form`); `{op:"response", record_id}` đọc sheet trả lời (Sheets API, tìm theo SĐT rồi CCCD). Chỉ đọc sheet.
+`{op:"link", record_id}` ghi `hr_form_sends` và trả link Google Form (tham số từ `app_settings.hr_form`); `{op:"response", record_id}` đọc sheet trả lời (Sheets API, tìm theo SĐT rồi CCCD). Chỉ đọc sheet. `link` trả `{url, sends}`. `response`: PO chốt 20/11 làm sau, khi có tài khoản dịch vụ Google (secret `GOOGLE_SA_JSON`); tới lúc đó trả 503 `HR_SHEET_NOT_CONFIGURED`.
 
 ### 4.8 `export` và `backup`
 
@@ -217,3 +217,4 @@ Trong 2 tuần chạy song song: hệ cũ **chỉ đọc**; chỉ một hệ đ�
 | 1.5 | 19/11/2026 | M5-2/M5-4: Kanban dùng `board_page` (thay `/api/board`), `board_cards` theo offset (như hệ cũ, thay cursor), `stage_history`. Kéo thả lưu bằng `records-save` op `move` (đã có từ M4) |
 | 1.6 | 20/11/2026 | M6-1: đọc qua `list_tasks(p_view, p_record_id)`, `list_interviews(p_record_id)`, `calendar_range(p_from, p_to, p_pic)`, `target_list(p_type, p_key, p_from, p_to)` (kỳ do client tính bằng `opsRules.periodRange`); ghi `tasks`, `interview_schedules`, `calendar_events`, `targets`, `hiring_checklists` qua PostgREST (RLS 0005), kiểm bằng `opsRules.validate*` ở trình duyệt. `confirm_hire` vẫn chờ M6-2 |
 | 1.7 | 20/11/2026 | M6-2: `records-save` thêm `{op:"confirm_hire"|"reopen_hire", id}` (không cần expected_version, như hệ cũ); trả `{record, hiring, ob_updated}`; lỗi `NOT_ELIGIBLE` 400, `HIRING_INCOMPLETE` 400, `LOCKED` 409, `FORBIDDEN` 403 (mở lại không phải Admin). Đọc checklist: RPC `hiring_state`. M6-3: RPC `alerts(p_today)` trả `{counts:{overdue, due_soon, passed_no_hr, missing_docs}, overdue, due_soon, passed_no_hr, missing_docs, today}` như `/api/alerts` cũ |
+| 1.8 | 20/11/2026 | M6-4: `hr-info-save` (save/verify), `hr-form` (link; response chờ GOOGLE_SA_JSON); RPC `hr_info_get`, `hr_duplicates`; verify/reopen cho TA phụ trách + Admin như hệ cũ (PO chốt) |

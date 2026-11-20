@@ -126,8 +126,19 @@ begin
   end; c := c + 1;
   select count(*) into n from public.hr_info where record_id = any(recs);
   assert n = 1, 'T1 chỉ thấy HR Info (CCCD…) của hồ sơ mình'; c := c + 1;
-  update public.hr_info set data = '{"a":1}' where record_id = r1; get diagnostics n = row_count;
-  assert n = 0, 'T1 không sửa HR Info đã verified'; c := c + 1;
+  -- 0018: HR Info chỉ ghi qua Edge hr-info-save (validate + nhật ký) – người dùng không ghi trực tiếp được
+  begin
+    update public.hr_info set data = '{"a":1}' where record_id = r1;
+    raise exception 'EXPECTED_DENY';
+  exception when others then
+    assert sqlerrm <> 'EXPECTED_DENY', 'T1 không sửa trực tiếp HR Info';
+  end; c := c + 1;
+  begin
+    insert into public.hr_info (record_id) values (r1);
+    raise exception 'EXPECTED_DENY';
+  exception when others then
+    assert sqlerrm <> 'EXPECTED_DENY', 'T1 không tạo trực tiếp HR Info';
+  end; c := c + 1;
   select count(*) into n from public.record_files where record_id = any(recs);
   assert n = 1, 'T1 chỉ thấy file của hồ sơ mình và không thấy file đã xóa'; c := c + 1;
   begin

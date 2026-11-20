@@ -109,27 +109,6 @@ export interface AttachmentInfo {
   uploaded_at: string;
 }
 
-export interface HrInfoRecord {
-  data: Record<string, string>;
-  status: 'draft' | 'submitted' | 'verified';
-  updated_by: string;
-  updated_at: string;
-  verified_by: string;
-  verified_at: string;
-}
-
-export interface HrDuplicates {
-  count: number;
-  own: string[];
-  others: number;
-  with: { code: string; pic: string }[];
-}
-
-export interface HrFormResponse {
-  info: HrInfoRecord | null;
-  history?: unknown[];
-}
-
 /** Thẻ Kanban (= boardCard_ của Pipeline.gs; RPC board_page / board_cards – 0013). */
 export interface BoardCard {
   id: number;
@@ -407,32 +386,7 @@ export const candidateService = {
   },
 
   // ===== HR Info: đọc được; ghi qua Edge hr-info-save (validate hrInfoRules) – M6-4 =====
-  async getHrInfo(candidateId: number): Promise<{ info: HrInfoRecord | null }> {
-    const { data, error } = await supabase.from('hr_info').select('data, status, updated_at, verified_at').eq('record_id', candidateId).maybeSingle();
-    if (error || !data) return { info: null };
-    return {
-      info: {
-        data: (data.data as Record<string, string>) || {},
-        status: data.status as HrInfoRecord['status'],
-        updated_by: '',
-        updated_at: data.updated_at || '',
-        verified_by: '',
-        verified_at: data.verified_at || '',
-      },
-    };
-  },
-  async hrFormLink(_candidateId: number): Promise<{ url: string }> {
-    throw notYet('Link Google Form thông tin nhân sự', 'M6-4');
-  },
-  async saveHrInfo(_candidateId: number, _data: Record<string, string>): Promise<void> {
-    throw notYet('Lưu thông tin nhân sự', 'M6-4');
-  },
-  async verifyHrInfo(_candidateId: number): Promise<void> {
-    throw notYet('Xác nhận thông tin nhân sự', 'M6-4');
-  },
-  async checkHrDuplicates(_candidateId: number, _idNumber: string): Promise<HrDuplicates> {
-    return { count: 0, own: [], others: 0, with: [] };
-  },
+  // HR Info / Google Form HR: services/hrService.ts (M6-4).
 
   async getMyForm(): Promise<FormInfo | null> {
     return null; // D-09: bỏ form nhập riêng mỗi TA
