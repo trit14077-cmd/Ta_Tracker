@@ -4,6 +4,23 @@
 import { translateText } from '../../shared/i18n.ts';
 
 export const NEW_EN: Record<string, string> = {
+  // ---- kiểm tra kết nối Google Drive (Edge drive-check)
+  'Thiếu secret Google trên Supabase.': 'Google secrets are missing on Supabase.',
+  'Đủ 4 secret Google.': 'All 4 Google secrets are set.',
+  'Google từ chối refresh token.': 'Google rejected the refresh token.',
+  'Đổi token được, có toàn quyền Drive.': 'Token exchanged; full Drive access.',
+  'Đổi token được nhưng chỉ có quyền drive.file: app chỉ thấy file do chính app tạo.':
+    'Token exchanged, but only with drive.file access: the app can only see files it created.',
+  'Đổi token được nhưng thiếu quyền Drive.': 'Token exchanged, but Drive access is missing.',
+  'Không đọc được tài khoản Drive.': 'Could not read the Drive account.',
+  'Đọc được tài khoản Drive.': 'Drive account read.',
+  'Không mở được thư mục gốc.': 'Could not open the root folder.',
+  'ID thư mục gốc không phải là thư mục.': 'The root folder ID is not a folder.',
+  'Thư mục gốc đang ở thùng rác.': 'The root folder is in the trash.',
+  'Không có quyền tạo file trong thư mục gốc.': 'No permission to create files in the root folder.',
+  'Thư mục gốc dùng được, tạo được file bên trong.': 'The root folder is usable; files can be created in it.',
+  'Chỉ Admin được kiểm tra kết nối Drive.': 'Only Admin may check the Drive connection.',
+  'Lỗi khi gọi Google. Vui lòng thử lại.': 'Error while calling Google. Please try again.',
   // ---- khung, giao diện mới
   'Đang chuyển sang hệ thống mới': 'Moving to the new system',
   'Màn hình này đang được chuyển sang hệ thống mới. Trong thời gian chuyển đổi, vui lòng tiếp tục dùng hệ thống cũ.':
