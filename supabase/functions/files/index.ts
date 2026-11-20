@@ -3,6 +3,7 @@
 //   JSON: {op:"download", record_id, kind | file_id} -> nội dung file (application/octet-stream)
 //         {op:"delete",   record_id, kind, [file_id]} -> {record}
 //         {op:"list",     record_id}                 -> {kinds, attachments, max_per_kind}
+//         {op:"app_cv",   application_id}            -> CV ứng viên gửi qua form ứng tuyển (M7-3)
 // Quyền hồ sơ do RPC 0022 kiểm (Admin, hoặc TA có pic trùng; pic rỗng => không ai ngoài Admin).
 // Edge kiểm loại, đuôi, ≤10 MB, nội dung đúng đuôi (magic bytes), Salary Proposal chỉ Rank 5 trở lên – TRƯỚC khi đưa lên Drive.
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
@@ -57,6 +58,18 @@ Deno.serve(async (req) => {
         return fail({ status: 400, code: 'BAD_JSON', message: 'Nội dung không phải JSON.' });
       }
     }
+    // CV ứng viên gửi qua form ứng tuyển online (hộp "Ứng tuyển online", M7-3)
+    if (body.op === 'app_cv') {
+      const { data, error } = await db.rpc('application_cv', { p_actor: prof.id, p_id: Number(body.application_id) });
+      if (error) return fail(rpcError(error));
+      const f = data as { drive_file_id: string; file_name: string };
+      const res = await download(f.drive_file_id);
+      return new Response(res.body, {
+        status: 200,
+        headers: { ...cors, 'Content-Type': 'application/octet-stream', 'Content-Disposition': contentDisposition(f.file_name) },
+      });
+    }
+
     const recordId = Number(body.record_id);
     if (!Number.isInteger(recordId) || recordId <= 0) return fail({ status: 422, code: 'VALIDATION_FAILED', message: 'Thiếu hoặc sai record_id.' });
     const kind = String(body.kind ?? '');

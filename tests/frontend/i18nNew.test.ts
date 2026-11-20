@@ -33,6 +33,8 @@ const FRAGMENTS = new Set(['Dữ liệu chưa hợp lệ:', 'Không lưu đượ
 // Câu chép từ hệ cũ mà từ điển cũ vốn chưa dịch (giữ như hệ cũ). Danh sách cố định trong repo để CI không cần thư mục OLD.
 // Chỉ được bớt (khi dịch thêm), không thêm câu mới vào đây – câu mới phải có tiếng Anh ở frontend/src/i18nNew.ts.
 const LEGACY = new Set<string>(JSON.parse(readFileSync(join(ROOT, 'tests/frontend/i18n_old_untranslated.json'), 'utf8')));
+// Trang tuyển dụng công khai (M7-3): chỉ tiếng Việt như hệ cũ (apply-main không bọc LangProvider) – không cần bản dịch.
+const PUBLIC_VI_ONLY = /PublicApplyForm\.tsx$|apply-main\.tsx$|functions[\\/]apply[\\/]/;
 const known = (v: string) => FRAGMENTS.has(v) || Boolean(NOUN_EN[v]) || translateAll(v) !== v || LEGACY.has(v);
 
 describe('câu mới của hệ mới đều có tiếng Anh', () => {
@@ -41,7 +43,7 @@ describe('câu mới của hệ mới đều có tiếng Anh', () => {
     expect(files.length).toBeGreaterThan(20);
     const missing: string[] = [];
     for (const f of files) {
-      if (f.endsWith('i18nNew.ts')) continue;
+      if (f.endsWith('i18nNew.ts') || PUBLIC_VI_ONLY.test(f)) continue;
       for (const v of literals(readFileSync(f, 'utf8'))) if (!known(v)) missing.push(`${f.replace(ROOT, '')}: ${v}`);
     }
     expect(missing).toEqual([]);

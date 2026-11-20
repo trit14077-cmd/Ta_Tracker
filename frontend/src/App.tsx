@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { LangSwitch } from './i18n.tsx';
 import {
   Users, FileSpreadsheet, BarChart3, ListFilter, History, ShieldCheck, LogOut, KeyRound, AlertTriangle,
-  ClipboardCheck, ChevronsLeft, ChevronsRight, ListTodo, CalendarDays, Target, Construction, Table2, SquareKanban, Search,
+  ClipboardCheck, ChevronsLeft, ChevronsRight, ListTodo, CalendarDays, Target, Construction, Table2, SquareKanban, Search, Inbox,
 } from 'lucide-react';
 import logoUrl from './assets/the-supra-logo.png';
 import { authService, type UserProfile } from './services/authService.ts';
@@ -25,6 +25,8 @@ import { AuditLogView } from './components/AuditLogView.tsx';
 import { DropdownAdminView } from './components/DropdownAdminView.tsx';
 import { HrFormConfigCard } from './components/HrFormConfigCard.tsx';
 import { ImportExcelView } from './components/ImportExcelView.tsx';
+import { ApplicationsInbox } from './components/ApplicationsInbox.tsx';
+import { applicationsService } from './services/applicationsService.ts';
 import { candidateService, type CandidateRecord, type DropdownDataResponse } from './services/candidateService.ts';
 
 type NavTab = 'candidates' | 'tasks' | 'calendar' | 'targets' | 'import_excel' | 'reports' | 'follow_wd' | 'droplist' | 'audit' | 'users';
@@ -150,6 +152,15 @@ export default function App() {
   const [kanbanKey, setKanbanKey] = useState(0);
   const [kanbanForm, setKanbanForm] = useState<CandidateRecord | null>(null);
   const [kanbanFormDirty, setKanbanFormDirty] = useState(false);
+  // "Ứng tuyển online" (M7-3, như hệ cũ): hộp hồ sơ ứng viên gửi qua form công khai + số hồ sơ mới trên nút
+  const [showApplications, setShowApplications] = useState(false);
+  const [newApplications, setNewApplications] = useState(0);
+  const [candListKey, setCandListKey] = useState(0);
+  const userId = user?.id;
+  useEffect(() => {
+    if (!userId) return;
+    applicationsService.countApplications().then((c) => setNewApplications(c.new || 0), () => undefined);
+  }, [userId]);
   // Mở hồ sơ từ Công việc / Lịch (hệ cũ: openCandidateById): cửa sổ chi tiết, "Sửa" mở form, "Lưu trữ" như danh sách.
   const [openDetail, setOpenDetail] = useState<CandidateRecord | null>(null);
   const [openBusy, setOpenBusy] = useState(false);
@@ -464,6 +475,18 @@ export default function App() {
           ) : activeTab === 'candidates' ? (
             <div className="space-y-3">
               <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowApplications(true)}
+                  className="relative inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-blue-700 bg-white border border-blue-200 rounded-lg shadow-sm hover:bg-blue-50"
+                >
+                  <Inbox className="w-3.5 h-3.5" /> Ứng tuyển online
+                  {newApplications > 0 && (
+                    <span className="ml-0.5 min-w-[18px] px-1.5 py-0.5 rounded-full bg-red-600 text-white text-[10px] leading-none" data-no-i18n>
+                      {newApplications > 99 ? '99+' : newApplications}
+                    </span>
+                  )}
+                </button>
                 {showKanban && (
                   <label className="inline-flex items-center gap-1.5 h-8 px-2.5 bg-white border border-slate-200 rounded-lg shadow-sm">
                     <Search className="w-3.5 h-3.5 text-slate-400" />
@@ -498,6 +521,18 @@ export default function App() {
                   })}
                 </div>
               </div>
+              {showApplications && (
+                <ApplicationsInbox
+                  user={user}
+                  dropdowns={dropdowns}
+                  onClose={() => setShowApplications(false)}
+                  onCandidateCreated={() => {
+                    setCandListKey((k) => k + 1);
+                    setKanbanKey((k) => k + 1);
+                  }}
+                  onCountChange={setNewApplications}
+                />
+              )}
               {showKanban ? (
                 <KanbanBoardView
                   key={`kanban-${kanbanKey}`}
@@ -508,6 +543,7 @@ export default function App() {
                 />
               ) : (
                 <CandidateTableView
+                  key={`table-${candListKey}`}
                   user={user}
                   dropdowns={dropdowns}
                   globalSearch=""

@@ -4,6 +4,37 @@
 import { translateText } from '../../shared/i18n.ts';
 
 export const NEW_EN: Record<string, string> = {
+  // ---- hộp "Ứng tuyển online" (ApplicationsInbox, 0024). Trang tuyển dụng công khai chỉ có tiếng Việt như hệ cũ.
+  'Đã tạo hồ sơ': 'Profile created',
+  'Đã bỏ qua': 'Skipped',
+  'Chưa lấy được link ứng tuyển.': 'Could not get the application link.',
+  'Đã lưu. Các link ứng tuyển giờ dùng địa chỉ trang công ty.': 'Saved. Application links now use the company page address.',
+  'Đã xóa. Link quay về trang tuyển dụng đi kèm hệ thống.': "Removed. Links go back to the system's own careers page.",
+  'Chưa lưu được.': 'Could not save.',
+  'Không cập nhật được.': 'Could not update.',
+  'Link gửi ứng viên': 'Link to send to candidates',
+  'Link chung (chưa gán TA)': 'General link (no TA yet)',
+  'Đang lấy link...': 'Getting the link...',
+  'Ứng viên mở link là điền được ngay, không cần đăng nhập. Hồ sơ gửi về nằm ở danh sách bên dưới, chưa vào danh sách ứng viên cho đến khi bạn bấm "Tạo hồ sơ".':
+    'Candidates can fill in the form as soon as they open the link, without signing in. Applications appear in the list below and are not added to the candidate list until you press "Tạo hồ sơ" (Create profile).',
+  'Dùng tên miền của công ty cho link': 'Use the company domain for the links',
+  'Địa chỉ trang tuyển dụng (đã đặt trang apply.html lên tên miền công ty)': 'Careers page address (apply.html placed on the company domain)',
+  'Để trống rồi bấm Lưu để quay về trang đi kèm hệ thống. Link cũ đã gửi cho ứng viên vẫn dùng được.':
+    "Leave it empty and press Save to go back to the system's own page. Links already sent to candidates keep working.",
+  'Chưa có hồ sơ mới. Gửi link phía trên cho ứng viên để bắt đầu nhận hồ sơ.': 'No new applications. Send the link above to candidates to start receiving them.',
+  'Không có hồ sơ.': 'No applications.',
+  '(của TA khác)': '(of another TA)',
+  '(khu vực mong muốn:': '(preferred area:',
+  'CV ứng viên gửi sẽ tự gắn vào hồ sơ sau khi lưu.': "The candidate's CV will be attached to the profile after saving.",
+  'Mất kết nối. Đang thử lại…': 'Connection lost. Retrying…',
+  'Link ứng tuyển không đúng.': 'The application link is not valid.',
+  'Chưa gửi được hồ sơ. Vui lòng thử lại.': 'The application was not sent. Please try again.',
+  'Chưa đánh dấu được hồ sơ ứng tuyển.': 'Could not mark the application.',
+  'Tài khoản chưa gán mã PIC nên chưa có link ứng tuyển.': 'This account has no PIC code, so it has no application link yet.',
+  'Mã PIC không có trong danh mục.': 'The PIC code is not in the list.',
+  'Địa chỉ phải bắt đầu bằng https:// (VD: https://tuyendung.thesupra.vn/).': 'The address must start with https:// (e.g. https://tuyendung.thesupra.vn/).',
+  'Không tìm thấy hồ sơ ứng tuyển.': 'Could not find the application.',
+  'Hồ sơ này không kèm CV.': 'This application has no CV.',
   // ---- bản tiếng Anh (TranslationPanel, 0023)
   'Đã sao chép prompt dịch. Dán vào Claude.': 'Translation prompt copied. Paste it into Claude.',
   'Không sao chép được, hãy chọn và sao chép thủ công.': 'Could not copy. Please select and copy it by hand.',
