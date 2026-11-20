@@ -144,6 +144,10 @@ jobs:
         run: |
           psql -v ON_ERROR_STOP=1 -f supabase/tests/applications_test.sql 2>&1 | tee apps.log
           grep -q "APPLICATIONS_TEST_PASSED" apps.log
+      - name: Nhật ký 12 tháng (0026) – chỉ xóa dòng đã xuất, chỉ Admin (tự rollback)
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/audit_purge_test.sql 2>&1 | tee purge.log
+          grep -q "AUDIT_PURGE_TEST_PASSED" purge.log
       - name: 20 phiên đồng thời tạo mã cùng PIC không trùng
         run: bash supabase/tests/concurrency_codes.sh
 

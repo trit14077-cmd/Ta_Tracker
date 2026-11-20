@@ -1,6 +1,6 @@
 // M7-1: Edge `files` – kiểm file trước khi đưa lên Drive, tên thư mục/file như hệ cũ.
 import { describe, expect, it } from 'vitest';
-import { attachmentKinds, checkFile, contentDisposition, drivePlacement, magicMatches } from '../../supabase/functions/files/logic.ts';
+import { attachmentKinds, checkFile, contentDisposition, drivePlacement, magicMatches, renamePlan } from '../../supabase/functions/files/logic.ts';
 
 const PDF = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31]);
 const ZIP = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0, 0]);
@@ -30,15 +30,40 @@ describe('checkFile', () => {
   });
 });
 
-describe('drivePlacement (documentRules như hệ cũ)', () => {
-  it('chưa có mã NV: dùng mã ứng viên', () => {
+describe('drivePlacement (như hệ cũ)', () => {
+  it('giấy tờ: TA Tracker Hồ sơ/<mã UV>_<tên>/…', () => {
     expect(drivePlacement({ candidate_code: 'TA10001', full_name: 'Nguyễn Văn A' }, 'health_check', 'scan.PDF')).toEqual({
-      folder: 'TA10001_Nguyễn Văn A', file: 'TA10001_Nguyễn Văn A_Giấy khám sức khỏe.pdf',
+      path: ['TA Tracker Hồ sơ', 'TA10001_Nguyễn Văn A'], file: 'TA10001_Nguyễn Văn A_Giấy khám sức khỏe.pdf',
     });
   });
-  it('có mã NV; CV và Payslip', () => {
-    expect(drivePlacement({ emp_id: 'E99', candidate_code: 'TA1', full_name: 'B' }, 'cv', 'x.docx').file).toBe('E99_B_CV.docx');
-    expect(drivePlacement({ candidate_code: 'TA1', full_name: 'B' }, 'payslip', 'x.pdf').file).toBe('TA1_B_Payslip.pdf');
+  it('CV: TA Tracker CV/<tên file gốc>; Payslip kèm số', () => {
+    expect(drivePlacement({ emp_id: 'E99', candidate_code: 'TA1', full_name: 'B' }, 'cv', 'C:\\fakepath\\CV: mới.docx')).toEqual({
+      path: ['TA Tracker CV'], file: 'CV_ mới.docx',
+    });
+    expect(drivePlacement({ candidate_code: 'TA1', full_name: 'B' }, 'payslip', 'x.pdf', 7).file).toBe('TA1_B_Payslip 7.pdf');
+    expect(drivePlacement({ emp_id: 'E99', candidate_code: 'TA1', full_name: 'B' }, 'salary_proposal', 'x.xlsx', 3)).toEqual({
+      path: ['TA Tracker Hồ sơ', 'E99_B'], file: 'E99_B_Salary Proposal 3.xlsx',
+    });
+  });
+});
+
+describe('renamePlan (= syncDocFiles_)', () => {
+  const before = { emp_id: '', candidate_code: 'TA1', full_name: 'Nguyễn A', health_check: 'D1|TA1_Nguyễn A_Giấy khám sức khỏe.pdf', id_card: 'Yes' };
+  const files = [
+    { id: 11, kind: 'health_check', drive_file_id: 'D1', file_name: 'TA1_Nguyễn A_Giấy khám sức khỏe.pdf' },
+    { id: 12, kind: 'payslip', drive_file_id: 'D2', file_name: 'TA1_Nguyễn A_Payslip 12.pdf' },
+  ];
+  it('không đổi Mã NV / tên / mã: không làm gì', () => {
+    expect(renamePlan(before, { ...before, phone: '9' }, files)).toEqual({ folder: null, columns: {}, items: [] });
+  });
+  it('có Mã NV: đổi cột giấy tờ, tên file, thư mục; giấy tờ "Yes" (không file) giữ nguyên', () => {
+    const p = renamePlan(before, { ...before, emp_id: 'E7' }, files);
+    expect(p.folder).toEqual(['TA Tracker Hồ sơ', 'E7_Nguyễn A']);
+    expect(p.columns).toEqual({ health_check: 'D1|E7_Nguyễn A_Giấy khám sức khỏe.pdf' });
+    expect(p.items).toEqual([
+      { id: 11, drive_file_id: 'D1', file_name: 'E7_Nguyễn A_Giấy khám sức khỏe.pdf' },
+      { id: 12, drive_file_id: 'D2', file_name: 'E7_Nguyễn A_Payslip 12.pdf' },
+    ]);
   });
 });
 

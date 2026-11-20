@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Search, X, PlusCircle } from 'lucide-react';
 
 interface SearchableSelectProps {
@@ -16,6 +17,8 @@ interface SearchableSelectProps {
 
 /**
  * Searchable Select component enforcing strict selection from allowed options only (no free text).
+ * Danh sách mở ra được vẽ ở <body> (portal) và đặt theo vị trí ô: khung cha có overflow-hidden không che mất phần dưới;
+ * hết chỗ phía dưới thì mở lên trên.
  */
 export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   value,
@@ -31,7 +34,33 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [pos, setPos] = useState<{ left: number; width: number; top?: number; bottom?: number; listMax: number } | null>(null);
+
+  // vị trí danh sách: dưới ô nếu đủ chỗ, không thì trên ô; cập nhật khi cuộn / đổi cỡ cửa sổ
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const el = containerRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const extra = 45 + (onProposeNewValue ? 40 : 0); // ô tìm + nút đề xuất
+      const below = window.innerHeight - r.bottom - 8;
+      const above = r.top - 8;
+      const width = Math.max(r.width, 220);
+      const left = Math.min(r.left, Math.max(8, window.innerWidth - width - 8));
+      if (below >= 224 + extra || below >= above) setPos({ left, width, top: r.bottom + 4, listMax: Math.max(96, Math.min(224, below - extra)) });
+      else setPos({ left, width, bottom: window.innerHeight - r.top + 4, listMax: Math.max(96, Math.min(224, above - extra)) });
+    };
+    place();
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    return () => {
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place);
+    };
+  }, [open, onProposeNewValue]);
 
   useEffect(() => {
     if (!open) {
@@ -45,7 +74,8 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
 
   useEffect(() => {
     const handleOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const t = e.target as Node;
+      if (containerRef.current && !containerRef.current.contains(t) && !panelRef.current?.contains(t)) {
         setOpen(false);
       }
     };
@@ -110,8 +140,12 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
         </div>
       </div>
 
-      {open && !disabled && (
-        <div className="absolute z-50 mt-1 w-full min-w-[220px] bg-white border border-slate-200 rounded-md shadow-lg overflow-hidden">
+      {open && !disabled && pos && createPortal(
+        <div
+          ref={panelRef}
+          style={{ position: 'fixed', left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom }}
+          className="z-[1000] bg-white border border-slate-200 rounded-md shadow-lg overflow-hidden"
+        >
           <div className="p-2 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
             <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             <input
@@ -124,7 +158,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
             />
           </div>
 
-          <div className="max-h-56 overflow-y-auto divide-y divide-slate-50">
+          <div className="overflow-y-auto divide-y divide-slate-50" style={{ maxHeight: pos.listMax }}>
             {filtered.length === 0 ? (
               <div className="px-3 py-3 text-xs text-slate-500 text-center">
                 Không có kết quả khớp trong danh sách.
@@ -177,7 +211,8 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
               </button>
             </div>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

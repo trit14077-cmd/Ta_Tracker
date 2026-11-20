@@ -6,11 +6,12 @@
 //         {op:"app_cv",   application_id}            -> CV ứng viên gửi qua form ứng tuyển (M7-3)
 // Quyền hồ sơ do RPC 0022 kiểm (Admin, hoặc TA có pic trùng; pic rỗng => không ai ngoài Admin).
 // Edge kiểm loại, đuôi, ≤10 MB, nội dung đúng đuôi (magic bytes), Salary Proposal chỉ Rank 5 trở lên – TRƯỚC khi đưa lên Drive.
+// Thư mục/tên file như hệ cũ (drivePlacement); file cũ khi xóa / thay vào thùng rác Drive (0025 trả `trash`).
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 import { corsHeaders } from '../admin-users/logic.ts';
 import { attachmentKind, attachmentKindApplicable } from '../../../shared/attachmentRules.ts';
 import { ATTACH_KINDS, MAX_PER_KIND, attachmentKinds, checkFile, contentDisposition, drivePlacement } from './logic.ts';
-import { DriveError, download, driveConfigured, ensureFolder, trash, upload } from './drive.ts';
+import { DriveError, download, driveConfigured, ensurePath, trash, upload } from './drive.ts';
 
 const URL_ = Deno.env.get('SUPABASE_URL')!;
 const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -96,7 +97,9 @@ Deno.serve(async (req) => {
     if (body.op === 'delete') {
       const { data, error } = await db.rpc('file_remove', { p_actor: prof.id, p_record_id: recordId, p_kind: kind, p_file_id: fileId });
       if (error) return fail(rpcError(error));
-      return json(200, data);
+      const r = data as { record: unknown; trash: string[] };
+      await Promise.all((r.trash ?? []).map(trash)); // như hệ cũ: file đã xóa vào thùng rác Drive
+      return json(200, { record: r.record });
     }
 
     if (body.op === 'upload') {
@@ -114,21 +117,35 @@ Deno.serve(async (req) => {
       if (perm.error) return fail(rpcError(perm.error));
       if (ATTACH_KINDS.includes(kind)) {
         const k = attachmentKind(kind)!;
-        if (!attachmentKindApplicable(k, rec.rank)) return fail({ status: 422, code: 'NOT_APPLICABLE', message: 'Loại tài liệu này không áp dụng cho Rank hiện tại của hồ sơ.' });
+        if (!attachmentKindApplicable(k, rec.rank)) {
+          return fail({ status: 400, code: 'KIND_NOT_APPLICABLE', message: `${k.label} chỉ áp dụng cho hồ sơ từ Rank 5 trở lên (Rank hiện tại: ${rec.rank || 'chưa chọn'}).` });
+        }
       }
 
-      const place = drivePlacement(rec, kind, file.name);
-      const folderId = await ensureFolder(place.folder);
+      // Salary Proposal / Payslips: số trong tên file = id của dòng (thay => giữ số cũ), như hệ cũ
+      let attId: number | null = null;
+      if (ATTACH_KINDS.includes(kind)) {
+        if (fileId) attId = fileId;
+        else {
+          const { data: rid, error: re } = await db.rpc('file_reserve_id');
+          if (re) throw new Error(re.message);
+          attId = Number(rid);
+        }
+      }
+      const place = drivePlacement(rec, kind, file.name, attId);
+      const folderId = await ensurePath(place.path);
       const driveId = await upload(folderId, place.file, chk.mime, buf);
       const { data, error } = await db.rpc('file_attach', {
         p_actor: prof.id, p_record_id: recordId, p_kind: kind, p_drive_id: driveId, p_name: place.file,
-        p_size: bytes.byteLength, p_mime: chk.mime, p_replace_id: fileId,
+        p_size: bytes.byteLength, p_mime: chk.mime, p_replace_id: fileId, p_id: fileId ? null : attId,
       });
       if (error) {
         await trash(driveId);
         return fail(rpcError(error));
       }
-      return json(200, data);
+      const r = data as { file: unknown; record: unknown; trash: string[] };
+      await Promise.all((r.trash ?? []).map(trash)); // file cũ bị thay => thùng rác Drive (như hệ cũ)
+      return json(200, { file: r.file, record: r.record });
     }
 
     return fail({ status: 422, code: 'INVALID_OP', message: 'op phải là upload, download, delete hoặc list.' });

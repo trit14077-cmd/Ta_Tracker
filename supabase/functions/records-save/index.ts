@@ -9,11 +9,38 @@ import {
 } from './logic.ts';
 import { corsHeaders } from '../admin-users/logic.ts';
 import { hiringView, planHire, type HiringRow } from './hiring.ts';
+import { renamePlan, type DriveFileRow } from '../files/logic.ts';
+import { driveConfigured, ensurePath, renameMove, trashIfEmpty } from '../files/drive.ts';
 
 const URL_ = Deno.env.get('SUPABASE_URL')!;
 const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ALLOWED = (Deno.env.get('ALLOWED_ORIGINS') ?? 'http://localhost:5173').split(',').map((s) => s.trim()).filter(Boolean);
 const db = createClient(URL_, SERVICE, { auth: { persistSession: false, autoRefreshToken: false } });
+
+/**
+ * = syncDocFiles_ của hệ cũ: Mã NV / họ tên / mã UV đổi => đổi tên + chuyển thư mục file trên Drive, bỏ thư mục cũ nếu trống.
+ * Chỉ là phần "cho đẹp": lỗi Drive không làm hỏng lần lưu (tên trong DB đã đúng; Drive sửa lại ở lần lưu sau).
+ */
+async function syncDriveNames(recordId: number, plan: ReturnType<typeof renamePlan>) {
+  if (!plan.folder || !plan.items.length || !driveConfigured()) return;
+  try {
+    const folderId = await ensurePath(plan.folder);
+    const oldParents = new Set<string>();
+    for (const it of plan.items) {
+      try {
+        const old = await renameMove(it.drive_file_id, it.file_name, folderId);
+        if (old && old !== folderId) oldParents.add(old);
+      } catch (e) {
+        console.error('records-save rename', (e as Error).message);
+      }
+    }
+    for (const p of oldParents) await trashIfEmpty(p).catch(() => undefined);
+  } catch (e) {
+    console.error('records-save drive', (e as Error).message);
+  }
+  const named = plan.items.filter((i) => i.id > 0).map((i) => ({ id: i.id, file_name: i.file_name }));
+  if (named.length) await db.rpc('file_set_names', { p_record_id: recordId, p_items: named });
+}
 
 async function loadConfig() {
   const [o, p, s, h] = await Promise.all([
@@ -128,11 +155,20 @@ Deno.serve(async (req) => {
       notices = v.notices;
     }
 
+    // tên file giấy tờ theo Mã NV / họ tên mới: cột "<id>|<tên>" đổi trong CÙNG lần lưu (tăng version như mọi trường khác)
+    let rename: ReturnType<typeof renamePlan> | null = null;
+    if (r.op === 'patch' && ['emp_id', 'candidate_code', 'full_name'].some((k) => k in changes)) {
+      const { data: files } = await db.rpc('file_drive_list', { p_record_id: r.id });
+      rename = renamePlan(row as Record<string, unknown>, { ...(row as Record<string, unknown>), ...changes }, (files ?? []) as DriveFileRow[]);
+      changes = { ...changes, ...rename.columns };
+    }
+
     const { data, error } = await db.rpc('save_record', {
       p_actor: actor.id, p_id: r.id, p_expected_version: rv.expected_version, p_changes: changes, p_meta: meta,
     });
     if (error) return fail(mapRpcError(error));
     const rec = data as Record<string, unknown>;
+    if (rename) await syncDriveNames(r.id, rename);
     return json(200, { record: rec, notices, duplicates: { phone: await duplicates(rec.phone as string, rec.id as number) } });
   } catch (e) {
     console.error('records-save', (e as Error).message);

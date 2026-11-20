@@ -4,6 +4,16 @@
 import { translateText } from '../../shared/i18n.ts';
 
 export const NEW_EN: Record<string, string> = {
+  'Chọn ngày trên lịch': 'Pick a date on the calendar',
+  // ---- lưu trữ nhật ký 12 tháng (AuditPurgeCard, Edge audit-purge, 0026)
+  'Không tải được.': 'Could not load.',
+  'Không dọn được nhật ký.': 'Could not archive the log.',
+  'Chỉ Admin được dọn nhật ký.': 'Only Admin may archive the log.',
+  'op phải là preview hoặc run.': 'op must be preview or run.',
+  'Không kết nối được Google Drive. Chưa xóa dòng nào chưa xuất.': 'Could not connect to Google Drive. No unexported rows were deleted.',
+  'Chỉ được xóa nhật ký cũ hơn 12 tháng.': 'Only log rows older than 12 months may be deleted.',
+  'Lưu trữ nhật ký cũ (chỉ Admin)': 'Archive old log (Admin only)',
+  'Xuất ra Drive và xóa': 'Export to Drive and delete',
   // ---- hộp "Ứng tuyển online" (ApplicationsInbox, 0024). Trang tuyển dụng công khai chỉ có tiếng Việt như hệ cũ.
   'Đã tạo hồ sơ': 'Profile created',
   'Đã bỏ qua': 'Skipped',
@@ -269,6 +279,9 @@ const PATTERNS: [RegExp, (...m: string[]) => string][] = [
   [/^View "(.*)" đã tồn tại\.$/, (_, v) => `View "${v}" already exists.`],
   [/^Trường không hợp lệ: (.*)$/, (_, f) => `Invalid field: ${f}`],
   [/^Tải xuống file: (.*)$/, (_, f) => `Download file: ${f}`],
+  [/^Mỗi hồ sơ tối đa (\d+) file (.+)\. Hãy xóa bớt file cũ\.$/, (_, n, k) => `Each profile can have at most ${n} ${k} files. Please delete some old files.`],
+  [/^(.+) chỉ áp dụng cho hồ sơ từ Rank 5 trở lên \(Rank hiện tại: (.*)\)\.$/,
+    (_, k, r) => `${k} only applies to profiles of Rank 5 and above (current Rank: ${r === 'chưa chọn' ? 'not selected' : r}).`],
   [/^Cột "(.*)" không tồn tại trong danh mục trường\.$/, (_, c) => `Column "${c}" is not in the field catalog.`],
   [/^Không thể sắp xếp theo cột "(.*)"\.$/, (_, c) => `Cannot sort by column "${c}".`],
   [/^Không lưu được hồ sơ tài khoản: (.*)$/, (_, e) => `Could not save the account profile: ${e}`],

@@ -57,12 +57,55 @@ export function checkFile(kind: string, name: string, size: number, head: Uint8A
   return { ok: true, ext, mime: MIME[ext] };
 }
 
-/** Thư mục + tên file trên Drive như hệ cũ: "<Mã NV hoặc mã UV>_<Họ tên>/<…>_<Tên giấy tờ>.<đuôi>". */
-export function drivePlacement(rec: { emp_id?: string; candidate_code?: string; full_name?: string }, kind: string, original: string) {
+/** Thư mục giấy tờ của hệ cũ (docsRoot_) và thư mục CV (cvFolder_) – nằm trong thư mục gốc của hệ thống. */
+export const DOCS_ROOT = 'TA Tracker Hồ sơ';
+export const CV_ROOT = 'TA Tracker CV';
+
+/** Tên file như người dùng tải lên, bỏ ký tự Drive không nhận (= hUploadCv_). */
+export function cleanOriginalName(name: string): string {
+  return String(name || '').split(/[\\/]/).pop()!.replace(/[\\/:*?"<>|]/g, '_').slice(0, 120);
+}
+
+/**
+ * Chỗ đặt file trên Drive như hệ cũ:
+ *  - CV: "TA Tracker CV/<tên file gốc>" (hUploadCv_);
+ *  - giấy tờ: "TA Tracker Hồ sơ/<Mã NV hoặc mã UV>_<Họ tên>/<…>_<Tên giấy tờ>.<đuôi>" (hUploadDoc_);
+ *  - Salary Proposal / Payslips: cùng thư mục, tên kèm số "<…>_Payslip 3.pdf" (attDriveName_).
+ */
+export function drivePlacement(rec: { emp_id?: string; candidate_code?: string; full_name?: string }, kind: string, original: string, attId?: number | null) {
+  if (kind === 'cv') return { path: [CV_ROOT], file: cleanOriginalName(original) };
   const emp = String(rec.emp_id || ''), code = String(rec.candidate_code || ''), name = String(rec.full_name || '');
-  const docName = kind === 'cv' ? 'CV'
-    : attachmentKind(kind)?.docName ?? FIELD_CATALOG.find((f) => f.key === kind)?.docName ?? kind;
-  return { folder: docFolderName(emp, code, name), file: docFileName(emp, code, name, docName, original) };
+  const att = attachmentKind(kind);
+  const docName = att ? `${att.docName} ${attId ?? ''}`.trim() : FIELD_CATALOG.find((f) => f.key === kind)?.docName ?? kind;
+  return { path: [DOCS_ROOT, docFolderName(emp, code, name)], file: docFileName(emp, code, name, docName, original) };
+}
+
+export interface DriveFileRow { id: number; kind: string; drive_file_id: string; file_name: string }
+/**
+ * Mã NV / họ tên / mã UV đổi (= syncDocFiles_ + syncAttachmentFiles_): tên mới của từng giấy tờ (ghi lại vào cột "<id>|<tên>")
+ * và của từng Salary Proposal / Payslip. Chỉ trả những file có tên đổi.
+ */
+export function renamePlan(before: Record<string, unknown>, after: Record<string, unknown>, files: DriveFileRow[]) {
+  const s = (o: Record<string, unknown>, k: string) => String(o[k] ?? '');
+  const same = ['emp_id', 'candidate_code', 'full_name'].every((k) => s(before, k) === s(after, k));
+  const columns: Record<string, string> = {};
+  const items: { id: number; drive_file_id: string; file_name: string }[] = [];
+  if (same) return { folder: null as string[] | null, columns, items };
+  const emp = s(after, 'emp_id'), code = s(after, 'candidate_code'), name = s(after, 'full_name');
+  for (const f of FIELD_CATALOG.filter((x) => x.type === 'document')) {
+    const v = s(after, f.key);
+    if (!v.includes('|')) continue;
+    const [driveId, oldName] = [v.slice(0, v.indexOf('|')), v.slice(v.indexOf('|') + 1)];
+    const want = docFileName(emp, code, name, f.docName || f.label, oldName);
+    if (want !== oldName) columns[f.key] = `${driveId}|${want}`;
+    const row = files.find((x) => x.kind === f.key && x.drive_file_id === driveId);
+    items.push({ id: row?.id ?? 0, drive_file_id: driveId, file_name: want });
+  }
+  for (const a of files.filter((x) => attachmentKind(x.kind))) {
+    const want = docFileName(emp, code, name, `${attachmentKind(a.kind)!.docName} ${a.id}`, a.file_name);
+    items.push({ id: a.id, drive_file_id: a.drive_file_id, file_name: want });
+  }
+  return { folder: [DOCS_ROOT, docFolderName(emp, code, name)], columns, items };
 }
 
 /** Các loại đính kèm (Salary Proposal, Payslips) và loại nào dùng được với Rank của hồ sơ. */

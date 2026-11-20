@@ -37,9 +37,9 @@ async function api(url: string, init: RequestInit = {}): Promise<Response> {
 const q = (s: string) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 const FOLDER = 'application/vnd.google-apps.folder';
 
-/** Thư mục con theo tên trong thư mục gốc (tạo nếu chưa có). */
-export async function ensureFolder(name: string): Promise<string> {
-  const root = env('GOOGLE_DRIVE_ROOT_FOLDER_ID');
+/** Thư mục con theo tên trong `parent` (mặc định thư mục gốc), tạo nếu chưa có. */
+export async function ensureFolder(name: string, parent = ''): Promise<string> {
+  const root = parent || env('GOOGLE_DRIVE_ROOT_FOLDER_ID');
   const query = `name = '${q(name)}' and '${q(root)}' in parents and mimeType = '${FOLDER}' and trashed = false`;
   const found = await (await api(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true`)).json() as { files?: { id: string }[] };
   if (found.files?.[0]?.id) return found.files[0].id;
@@ -47,6 +47,33 @@ export async function ensureFolder(name: string): Promise<string> {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, mimeType: FOLDER, parents: [root] }),
   })).json() as { id: string };
   return made.id;
+}
+
+/** Thư mục theo đường dẫn tính từ thư mục gốc, VD ['TA Tracker Hồ sơ', 'TA10001_Nguyễn Văn A'] (= personFolder_ của hệ cũ). */
+export async function ensurePath(names: string[]): Promise<string> {
+  let id = '';
+  for (const n of names) id = await ensureFolder(n, id);
+  return id;
+}
+
+/** Đổi tên file và (nếu cần) chuyển sang thư mục khác; trả thư mục cũ khi có chuyển (= syncDocFiles_). */
+export async function renameMove(fileId: string, name: string, folderId: string): Promise<string | null> {
+  const cur = await (await api(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=name,parents&supportsAllDrives=true`)).json() as { name?: string; parents?: string[] };
+  const oldParent = cur.parents?.[0] ?? '';
+  const move = oldParent !== folderId;
+  if (cur.name === name && !move) return null;
+  const qs = move ? `&addParents=${encodeURIComponent(folderId)}${oldParent ? `&removeParents=${encodeURIComponent(oldParent)}` : ''}` : '';
+  await api(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=id&supportsAllDrives=true${qs}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
+  });
+  return move ? oldParent : null;
+}
+
+/** Bỏ thư mục vào thùng rác khi không còn file nào (thư mục cũ sau khi đổi tên). */
+export async function trashIfEmpty(folderId: string): Promise<void> {
+  const query = `'${q(folderId)}' in parents and trashed = false`;
+  const r = await (await api(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true`)).json() as { files?: unknown[] };
+  if (!r.files?.length) await trash(folderId);
 }
 
 /** Tải lên (resumable: 1 lần khởi tạo + 1 lần gửi nội dung, chạy với mọi cỡ ≤10 MB). Trả drive file id. */
@@ -69,7 +96,7 @@ export async function download(fileId: string): Promise<Response> {
   return await api(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`);
 }
 
-/** Dọn file vừa tải lên khi ghi DB thất bại (cho vào thùng rác, không xóa hẳn). */
+/** Cho file vào thùng rác (không xóa hẳn): file cũ khi xóa / thay như hệ cũ, hoặc file vừa tải khi ghi DB lỗi. */
 export async function trash(fileId: string): Promise<void> {
   await api(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?supportsAllDrives=true`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }),

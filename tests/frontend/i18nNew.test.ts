@@ -28,7 +28,10 @@ function literals(src: string): string[] {
   return out;
 }
 // Mảnh câu ghép với giá trị (dịch qua mẫu ở i18nNew.ts)
-const FRAGMENTS = new Set(['Dữ liệu chưa hợp lệ:', 'Không lưu được hồ sơ tài khoản:', 'Chưa xác nhận tuyển được, còn thiếu:', 'Giá trị "']);
+const FRAGMENTS = new Set(['Dữ liệu chưa hợp lệ:', 'Không lưu được hồ sơ tài khoản:', 'Chưa xác nhận tuyển được, còn thiếu:', 'Giá trị "',
+  'Mỗi hồ sơ tối đa 20 file',
+  // tên thư mục trên Drive như hệ cũ (dữ liệu, không hiện trên giao diện)
+  'TA Tracker Hồ sơ', 'TA Tracker Nhật ký']);
 
 // Câu chép từ hệ cũ mà từ điển cũ vốn chưa dịch (giữ như hệ cũ). Danh sách cố định trong repo để CI không cần thư mục OLD.
 // Chỉ được bớt (khi dịch thêm), không thêm câu mới vào đây – câu mới phải có tiếng Anh ở frontend/src/i18nNew.ts.

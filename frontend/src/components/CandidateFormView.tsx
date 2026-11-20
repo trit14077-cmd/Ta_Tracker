@@ -45,6 +45,7 @@ import {
 } from '../services/candidateService.ts';
 import type { UserProfile } from '../services/authService.ts';
 import { SearchableSelect } from './SearchableSelect.tsx';
+import { DatePickButton } from './DatePickButton.tsx';
 import { ConflictResolutionModal } from './ConflictResolutionModal.tsx';
 import { ProposeDropdownModal } from './ProposeDropdownModal.tsx';
 import { HrInfoBanner } from './HrInfoBanner.tsx';
@@ -1140,6 +1141,7 @@ export const CandidateFormView: React.FC<CandidateFormViewProps> = ({
                           }`}
                         />
                       ) : (
+                        <div className="relative">
                         <input
                           type="text"
                           list={field.key === 'pending_at' ? 'suggest-pending_at' : undefined}
@@ -1180,8 +1182,12 @@ export const CandidateFormView: React.FC<CandidateFormViewProps> = ({
                               : errText
                               ? 'bg-white border-red-500 text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-200'
                               : 'bg-white border-slate-300 text-slate-900 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100'
-                          }`}
+                          } ${field.type === 'date' && !disabled ? 'pr-9' : ''}`}
                         />
+                        {field.type === 'date' && (
+                          <DatePickButton value={String(displayValue ?? '')} disabled={disabled} onPick={(d) => updateField(field.key, d)} />
+                        )}
+                        </div>
                       )}
 
                       {errText && (
