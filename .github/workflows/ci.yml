@@ -136,6 +136,10 @@ jobs:
         run: |
           psql -v ON_ERROR_STOP=1 -f supabase/tests/files_test.sql 2>&1 | tee files.log
           grep -q "FILES_TEST_PASSED" files.log
+      - name: Bản tiếng Anh (0023) – quyền hồ sơ, cần bản gốc, nhật ký TRANSLATION (tự rollback)
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/translations_test.sql 2>&1 | tee trans.log
+          grep -q "TRANSLATIONS_TEST_PASSED" trans.log
       - name: 20 phiên đồng thời tạo mã cùng PIC không trùng
         run: bash supabase/tests/concurrency_codes.sh
 

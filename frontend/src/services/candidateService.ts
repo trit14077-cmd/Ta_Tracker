@@ -10,6 +10,7 @@ import {
 import { INITIAL_DROPDOWN_LISTS } from '../../../shared/seedData.ts';
 import { buildConfig } from '../../../supabase/functions/records-save/logic.ts';
 import { downloadXlsx } from './xlsxDownload.ts';
+import { translationHash } from '../../../shared/attachmentRules.ts';
 import type { DupInfo } from '../../../shared/dup.ts';
 
 export interface CandidateRecord {
@@ -108,6 +109,16 @@ export interface AttachmentInfo {
   size: number;
   uploaded_by: string;
   uploaded_at: string;
+}
+
+/** Bản tiếng Anh của 1 ô chữ tự do (= TranslationInfo của hệ cũ; RPC 0023). */
+export interface TranslationInfo {
+  field_key: string;
+  source_text: string;
+  en_text: string;
+  status: 'none' | 'translated' | 'outdated';
+  updated_by: string;
+  updated_at: string;
 }
 
 /** Thẻ Kanban (= boardCard_ của Pipeline.gs; RPC board_page / board_cards – 0013). */
@@ -382,6 +393,24 @@ export const candidateService = {
   },
   async deleteAttachment(candidateId: number, attachmentId: number): Promise<void> {
     await filesCall({ op: 'delete', record_id: candidateId, file_id: attachmentId }, 'Không xóa được file.');
+  },
+
+  // ===== bản tiếng Anh (M7-2, RPC 0023): trạng thái tính như transStatus_ của hệ cũ =====
+  async getTranslations(candidateId: number): Promise<TranslationInfo[]> {
+    const { data, error } = await supabase.rpc('translation_list', { p_record_id: candidateId });
+    if (error) throw new ApiError(error.details || 'Không tải được bản dịch.', 404, error.message || 'NOT_FOUND');
+    return ((data || []) as (Omit<TranslationInfo, 'status'> & { source_hash: string })[]).map(({ source_hash, ...t }) => ({
+      ...t,
+      status: !t.en_text ? 'none' : source_hash === translationHash(t.source_text) ? 'translated' : 'outdated',
+    }));
+  },
+  async putTranslation(candidateId: number, fieldKey: string, enText: string): Promise<void> {
+    const list = await this.getTranslations(candidateId);
+    const source = list.find((t) => t.field_key === fieldKey)?.source_text ?? '';
+    const { error } = await supabase.rpc('translation_save', {
+      p_record_id: candidateId, p_field_key: fieldKey, p_en_text: enText, p_source_hash: translationHash(source),
+    });
+    if (error) throw new ApiError(error.details || 'Không lưu được bản dịch.', 400, error.message || 'TRANSLATION_FAILED');
   },
 
   // ===== Drop-list =====

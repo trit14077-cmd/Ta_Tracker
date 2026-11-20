@@ -4,6 +4,11 @@
 import { translateText } from '../../shared/i18n.ts';
 
 export const NEW_EN: Record<string, string> = {
+  // ---- bản tiếng Anh (TranslationPanel, 0023)
+  'Đã sao chép prompt dịch. Dán vào Claude.': 'Translation prompt copied. Paste it into Claude.',
+  'Không sao chép được, hãy chọn và sao chép thủ công.': 'Could not copy. Please select and copy it by hand.',
+  'Đã lưu bản dịch.': 'Translation saved.',
+  'Không lưu được bản dịch.': 'Could not save the translation.',
   // ---- câu trả lời Google Form HR (Edge hr-form op:response, gộp vào form thông tin nhân sự)
   'Sheet trả lời Google Form chưa có câu trả lời nào.': 'The Google Form answer sheet has no answers yet.',
   'Không đọc được câu trả lời Google Form.': 'Could not read the Google Form answer.',
