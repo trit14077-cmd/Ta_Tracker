@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { FileDown, ImagePlus, X } from 'lucide-react';
 import logoUrl from '../assets/the-supra-logo.png';
 import type { CandidateRecord } from '../services/candidateService.ts';
+import { positionEn } from '../../../shared/positionCatalog.ts';
 import { CV_LABELS, type CvData, type CvLang, GENDER_EN, cvHtml, yearOf } from '../../../shared/cvTemplate.ts';
 
 const asBullets = (s: string) =>
@@ -13,7 +14,7 @@ const asBullets = (s: string) =>
     .join('\n');
 
 function defaultIntro(c: Record<string, string>, lang: CvLang): string {
-  const pos = c.position || '';
+  const pos = lang === 'en' ? positionEn(c.position || '') : c.position || '';
   const years = c.experience_years || '';
   if (lang === 'en') return [pos && `Candidate for the position of ${pos}.`, years && `Experience: ${years}.`].filter(Boolean).join(' ').replace(/năm/g, 'years');
   return [pos && `Ứng viên vị trí ${pos}.`, years && `Kinh nghiệm: ${years}.`].filter(Boolean).join(' ');
@@ -39,6 +40,8 @@ export const CvBuilderModal: React.FC<{ candidate: CandidateRecord; onClose: () 
 
   useEffect(() => {
     setIntro(defaultIntro(c, lang));
+    // chức danh theo ngôn ngữ CV: tên tiếng Anh theo danh mục vị trí 18.11
+    setTitle(lang === 'en' ? positionEn(String(c.position || '')) : String(c.position || ''));
     setExperience(asBullets(c.experience_summary));
   }, [lang, c]);
 

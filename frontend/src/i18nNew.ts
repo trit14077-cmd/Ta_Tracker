@@ -3,6 +3,8 @@
 // Test: tests/frontend/i18nNew.test.ts quét mọi câu tiếng Việt mới trong frontend/src + supabase/functions và kiểm có bản dịch.
 import { translateText } from '../../shared/i18n.ts';
 
+import { POSITION_EN } from '../../shared/positionCatalog.ts';
+
 export const NEW_EN: Record<string, string> = {
   'Chọn ngày trên lịch': 'Pick a date on the calendar',
   // ---- lưu trữ nhật ký 12 tháng (AuditPurgeCard, Edge audit-purge, 0026)
@@ -307,6 +309,9 @@ export function translateNew(text: string): string {
   const core = text.slice(lead.length, text.length - trail.length);
   const direct = NEW_EN[core];
   if (direct !== undefined) return lead + direct + trail;
+  // tên vị trí (danh mục 18.11) – giao diện English hiện tên tiếng Anh
+  const pos = POSITION_EN[core.normalize('NFC')];
+  if (pos !== undefined && pos !== core) return lead + pos + trail;
   for (const [re, build] of PATTERNS) {
     const m = re.exec(core);
     if (m) return lead + build(...m) + trail;

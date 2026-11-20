@@ -1,5 +1,6 @@
 import { FIELD_CATALOG, FieldDefinition } from './fieldCatalog.ts';
 import { lookupPositionInfo } from './positionMap.ts';
+import { normalizePosition } from './positionCatalog.ts';
 import { requiredDocuments } from './documentRules.ts';
 import {
   REASON_EXPECTED,
@@ -653,6 +654,9 @@ export function applyLegacyImportTransformations(row: Record<string, string>): R
     const v = (transformed[k] || '').trim().normalize('NFC');
     if (v && REASON_RENAMES[v]) transformed[k] = REASON_RENAMES[v];
   }
+
+  // Vị trí: tên cũ (tên tiếng Anh / khác hoa-thường) -> tên chuẩn theo danh mục 18.11 (positionCatalog.ts, 0027)
+  if (transformed.position) transformed.position = normalizePosition(transformed.position);
 
   if (transformed.r1_time) {
     transformed.r1_time = normalizeExcelTimeValue(transformed.r1_time);
