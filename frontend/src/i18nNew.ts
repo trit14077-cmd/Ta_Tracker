@@ -4,6 +4,12 @@
 import { translateText } from '../../shared/i18n.ts';
 
 export const NEW_EN: Record<string, string> = {
+  // ---- câu trả lời Google Form HR (Edge hr-form op:response, gộp vào form thông tin nhân sự)
+  'Sheet trả lời Google Form chưa có câu trả lời nào.': 'The Google Form answer sheet has no answers yet.',
+  'Không đọc được câu trả lời Google Form.': 'Could not read the Google Form answer.',
+  'Chưa cấu hình tài khoản Google để đọc sheet trả lời của form.': 'No Google account is set up to read the form answer sheet.',
+  'Không mở được sheet trả lời. Hãy chia sẻ sheet (quyền xem) cho tài khoản Google của hệ thống và kiểm tra tên tab trong cấu hình form HR.':
+    "Could not open the answer sheet. Share the sheet (view access) with the system's Google account and check the tab name in the HR form settings.",
   // ---- file trên Google Drive (Edge files, 0022)
   'Chưa cấu hình Google Drive cho hệ thống.': 'Google Drive is not set up for the system.',
   'Chưa chọn file.': 'No file selected.',

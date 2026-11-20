@@ -26,7 +26,7 @@ export const HrFormConfigCard: React.FC = () => {
     <div className="bg-white border border-slate-200 rounded-lg p-4 mt-4">
       <h3 className="text-sm font-bold text-slate-900">Form thông tin nhân viên (Google Form của công ty)</h3>
       <p className="text-xs text-slate-600 mt-1">
-        Nút “Link form” trong hồ sơ ứng viên đã đạt vòng 2 sao chép link này. Nút “Link trả lời” tìm câu trả lời của ứng viên trong sheet trả lời theo SĐT, rồi theo CCCD. Sheet phải được chia sẻ (quyền xem) cho tài khoản Google chạy hệ thống.
+        Nút “Link form” trong hồ sơ ứng viên đã đạt vòng 2 sao chép link này. Khi mở form thông tin nhân sự, hệ thống tự tìm câu trả lời của ứng viên trong sheet trả lời theo SĐT, rồi theo CCCD, và điền sẵn các ô còn trống. Sheet phải được chia sẻ (quyền xem) cho tài khoản Google chạy hệ thống.
       </p>
       <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2">
         <input value={hrCfg.form_url} onChange={(e) => setHrCfg({ ...hrCfg, form_url: e.target.value })} placeholder="Link Google Form" className="px-2 py-1.5 text-xs border border-slate-300 rounded" data-no-i18n />

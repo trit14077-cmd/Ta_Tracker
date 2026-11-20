@@ -9,7 +9,7 @@ export function driveConfigured(): boolean {
   return ['GOOGLE_OAUTH_CLIENT_ID', 'GOOGLE_OAUTH_CLIENT_SECRET', 'GOOGLE_OAUTH_REFRESH_TOKEN', 'GOOGLE_DRIVE_ROOT_FOLDER_ID'].every((k) => env(k));
 }
 
-async function token(): Promise<string> {
+export async function token(): Promise<string> {
   if (cached && cached.until > Date.now()) return cached.token;
   const r = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -74,4 +74,21 @@ export async function trash(fileId: string): Promise<void> {
   await api(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?supportsAllDrives=true`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }),
   }).catch(() => undefined);
+}
+
+export function googleConfigured(): boolean {
+  return ['GOOGLE_OAUTH_CLIENT_ID', 'GOOGLE_OAUTH_CLIENT_SECRET', 'GOOGLE_OAUTH_REFRESH_TOKEN'].every((k) => env(k));
+}
+
+/** Đọc 1 tab của Google Sheet (giá trị như hiển thị). 403/404 => SheetAccessError (sheet chưa chia sẻ cho tài khoản Google của hệ thống). */
+export class SheetAccessError extends Error {}
+export async function readSheet(sheetId: string, tab: string): Promise<unknown[][]> {
+  const range = encodeURIComponent(`'${tab.replace(/'/g, "''")}'`);
+  const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}/values/${range}?valueRenderOption=FORMATTED_VALUE`, {
+    headers: { Authorization: `Bearer ${await token()}` },
+  });
+  if (r.status === 400 || r.status === 403 || r.status === 404) throw new SheetAccessError(String(r.status)); // 400: sai tên tab
+  if (!r.ok) throw new DriveError(`sheets ${r.status}`);
+  const j = await r.json() as { values?: unknown[][] };
+  return j.values ?? [];
 }
