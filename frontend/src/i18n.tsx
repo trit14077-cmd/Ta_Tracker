@@ -1,5 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { Lang, translateText } from '../../shared/i18n.ts';
+import type { Lang } from '../../shared/i18n.ts';
+// M7-7: từ điển hệ cũ + câu mới của hệ mới (i18nNew.ts)
+import { translateAll as translateText } from './i18nNew.ts';
 
 /**
  * Language switch (Vietnamese is the source language). In English mode a small translator walks the page and swaps

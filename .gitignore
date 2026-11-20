@@ -14,6 +14,7 @@ Master.xlsx
 *.xlsx
 *.xls
 *.csv
+~$*
 etl-out/
 scripts/out/
 *.dump
