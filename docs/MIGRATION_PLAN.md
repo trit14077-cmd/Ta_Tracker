@@ -38,6 +38,12 @@ Nguyên tắc: **không xóa dữ liệu cũ**; mọi bước có thể chạy l
 - **Khác với quy trình chính thức ở §4–§5, chỉ có giá trị diễn tập:** dùng Master thật chưa ẩn danh; ETL viết bằng Python, chưa dùng `src/shared` (`applyLegacyImportTransformations`, validate); E1 tự cấp mã `IT#####` (trái E1a); nạp cả dòng E3–E5 (trái Q5a); `created_at` chỉ có ngày, lưu 00:00 UTC; 1 dòng thiếu `created_at` nhận `now()`.
 - **ĐÃ LÀM 19/11/2026 (M8-0):** DEV đã thay bằng bản ẩn danh (lô 4). Mô tả gốc của việc: xóa lô dữ liệu thật trên DEV và nạp lại bằng bản đã ẩn thông tin cá nhân (tên, SĐT, email, địa chỉ, ngày sinh, mã NV, lương, ghi chú tự do), giữ nguyên các cột trạng thái để KPI vẫn đối chiếu được.
 
+### 2.2 PO chốt phạm vi 20/11/2026
+
+- App Apps Script cũ **chưa chạy thật**; dữ liệu thật duy nhất là **bảng Master** (Excel người dùng, tiêu đề 2 tầng). Vì vậy M8 chỉ chuyển hồ sơ ứng viên (`recruitment_records`); tài khoản TA/Admin tạo mới trên hệ mới; các sheet Users/Comments/Tasks/Interviews/HrInfo/Attachments/Applications/Audit… ở §1 **không có dữ liệu để chuyển**.
+- ETL: `npx tsx scripts/migrate/master.ts "<bản chụp .xlsx>"` – đọc theo đúng đường Nhập Excel của hệ cũ (dò tiêu đề, `applyLegacyImportTransformations`, `validateAndComputeCandidate`), kiểm **chặt** (Q5a), E1a; danh mục Drop-list đọc từ DB đích (chỉ đọc). Ra `etl-out/migrate/` (ngoài git): `master_records.jsonl`, `master_exceptions.csv` (E1, E3, E4, E5, E7, E8, E9, DM = ngoài danh mục), `master_merged.csv`, `master_phone_groups.csv` (E6), `master_summary.json` (tổng = nạp + gộp + ngoại lệ). Chạy lại 3 lần cùng SHA-256.
+- Chưa làm: chuẩn hóa tên vị trí theo file Việt–Anh 18.11 (chờ PO duyệt bảng `De_xuat_chuan_hoa_vi_tri.xlsx`), bước nạp (dữ liệu thật **không** nạp vào DEV – M8-0), bộ đối chiếu M8-3.
+
 ## 3. Chuẩn bị trước khi trích xuất
 
 1. **Đóng băng ghi** trên hệ cũ (thông báo cho TA/Admin, tạm dừng form ứng tuyển hoặc chấp nhận thu delta bằng `Applications`).

@@ -117,7 +117,7 @@ Kích cỡ: S ≤ nửa ngày, M ≈ 1–2 ngày, L ≈ 3–5 ngày công của 
 |---|---|---|---|
 | M8-0 | Thay dữ liệu thật trên DEV bằng bản ẩn danh (DEV-DATA a): bước ẩn danh trong ETL + xóa lô hiện tại + nạp lại, KPI vẫn khớp | S | DEV không còn tên/SĐT/email/địa chỉ/ngày sinh/mã NV/lương thật – **ĐẠT 19/11/2026**: `scripts/etl/anonymize_records.py` (HMAC khóa dùng 1 lần, ánh xạ một-một giữ nhóm trùng SĐT 709/709), nạp lô 4 thay lô thật 3; KPI 6/6 khớp; kiểm trên DEV: 0 SĐT/email/mã NV/ghi chú/lương thật. CSV chưa ẩn danh chỉ còn trong `etl-out/` trên máy PO |
 | M8-1 | Script ETL `scripts/migrate/` (trích xuất → staging → biến đổi → nạp), dùng `src/shared`; áp E1a, Q5a (không nạp dòng lỗi, xuất báo cáo). Bản Python `scripts/etl/` hiện có chỉ là diễn tập (MIGRATION_PLAN §2.1) | L | chạy lại 3 lần cùng kết quả |
-| M8-2 | Báo cáo ngoại lệ E1–E12 | M | |
+| M8-2 | Báo cáo ngoại lệ E1–E12 | M | – **20/11: PO chốt chỉ chuyển bảng Master (app cũ chưa chạy thật). `scripts/migrate/master.ts` (+ masterEtl.ts, test 13): chạy 3 lần cùng SHA-256; Master.xlsx 17/11: 9.829 = 8.814 nạp + 1.015 ngoại lệ (E1 41, E3 658, E4 258, E5 77, E7 2, E9 2, DM 2; E6 582 nhóm) – khớp số liệu Phase 7. Còn: chuẩn hóa vị trí (chờ PO), bước nạp, M8-3** |
 | M8-3 | Bộ đối chiếu (số dòng, hash cột, KPI, board, RLS) | M | |
 | M8-4 | Dry-run bản sao production → PO duyệt ngoại lệ | M | |
 

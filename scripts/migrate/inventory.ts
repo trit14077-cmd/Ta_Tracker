@@ -1,5 +1,7 @@
 // M8-1 bước 0 – kiểm kê bản chụp "The Supra" (.xlsx tải về máy): SHA-256, từng sheet có đủ cột như hệ cũ không, số dòng.
-// Chạy (Node ≥ 22.6, tự bỏ kiểu TS):  node scripts/migrate/inventory.ts "D:\Ta_Tracker-main\The Supra.xlsx" [thư mục ra]
+// Ghi chú 20/11/2026: PO xác nhận app cũ chưa chạy thật => nguồn M8 chỉ là bảng Master (master.ts); lệnh này giữ để kiểm
+// bản chụp nếu sau này có thêm sheet của app cũ.
+// Chạy:  npx tsx scripts/migrate/inventory.ts "D:\Ta_Tracker-main\The Supra.xlsx" [thư mục ra]
 // Thư mục ra mặc định etl-out/migrate (ngoài git). CHỈ ĐỌC file nguồn; không ghi DB; không in dữ liệu cá nhân (chỉ tên cột + số dòng).
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -9,7 +11,7 @@ import { OLD_SHEETS, checkSheet } from './oldSchema.ts';
 
 const src = process.argv[2];
 if (!src) {
-  console.error('Cách dùng: node scripts/migrate/inventory.ts <file .xlsx> [thư mục ra]');
+  console.error('Cách dùng: npx tsx scripts/migrate/inventory.ts <file .xlsx> [thư mục ra]');
   process.exit(2);
 }
 const out = resolve(process.argv[3] ?? 'etl-out/migrate');
