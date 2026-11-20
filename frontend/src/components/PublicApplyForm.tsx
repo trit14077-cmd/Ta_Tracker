@@ -88,8 +88,11 @@ export const PublicApplyForm: React.FC<{ code: string }> = ({ code }) => {
         setLinkState('ok');
       },
       (e) => {
-        setLinkState('bad');
-        setLinkError(e instanceof Error ? e.message : 'Link ứng tuyển không đúng.');
+        // Chỉ link sai thật (404 BAD_LINK) mới thay form bằng thông báo; lỗi mạng thì vẫn cho điền (khi gửi trang tự thử lại).
+        if (e instanceof ApiError && e.status === 404) {
+          setLinkState('bad');
+          setLinkError(e.message);
+        } else setLinkState('ok');
       }
     );
   }, [code]);
