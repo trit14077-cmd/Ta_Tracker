@@ -5,7 +5,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 import {
   buildConfig, mapRpcError, maskDuplicates, parseRequest, planMove, rowToStrings, toDbValues, validateCreate, validatePatch,
-  type Actor, type ApiError,
+  type Actor, type ApiError, type SaveRequest,
 } from './logic.ts';
 import { corsHeaders } from '../admin-users/logic.ts';
 import { hiringView, planHire, type HiringRow } from './hiring.ts';
@@ -102,7 +102,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (row.row_version !== r.expected_version) {
+    // các thao tác còn lại đều có expected_version (patch | move | archive | restore)
+    const rv = r as Extract<SaveRequest, { expected_version: number }>;
+    if (row.row_version !== rv.expected_version) {
       return fail({ status: 409, code: 'VERSION_CONFLICT', message: 'Hồ sơ ứng viên này vừa được người dùng khác cập nhật. Vui lòng đối chiếu phiên bản hiện tại trước khi ghi đè.', details: { current: row } });
     }
     const existing = rowToStrings(row);
@@ -127,7 +129,7 @@ Deno.serve(async (req) => {
     }
 
     const { data, error } = await db.rpc('save_record', {
-      p_actor: actor.id, p_id: r.id, p_expected_version: r.expected_version, p_changes: changes, p_meta: meta,
+      p_actor: actor.id, p_id: r.id, p_expected_version: rv.expected_version, p_changes: changes, p_meta: meta,
     });
     if (error) return fail(mapRpcError(error));
     const rec = data as Record<string, unknown>;
