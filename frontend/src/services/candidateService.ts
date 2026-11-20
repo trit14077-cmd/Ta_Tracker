@@ -228,7 +228,6 @@ async function callRecordsSave(body: Record<string, unknown>, fallback: string) 
 }
 
 const COLS_KEY = 'ta_col_prefs';
-const LIST_LABELS: Record<string, string> = Object.fromEntries(INITIAL_DROPDOWN_LISTS.map((l) => [l.listKey, l.label]));
 
 function toComment(c: Record<string, unknown>): CandidateComment {
   return {
@@ -381,7 +380,8 @@ export const candidateService = {
     ]);
     if (o.error || p.error || s.error || h.error) throw new ApiError('Không tải được danh mục Drop-list.', 500, 'DROPDOWNS_FAILED');
     const cfg = buildConfig(o.data!, p.data!, s.data!, h.data!);
-    const listMeta = Object.keys(cfg.lists).filter((k) => k !== 'pic').map((k) => ({ listKey: k, label: LIST_LABELS[k] || k }));
+    // = hGetDropdowns_ của hệ cũ: mọi danh mục trong INITIAL_DROPDOWN_LISTS (có PIC – Admin quản lý ở trang Drop-list)
+    const listMeta = INITIAL_DROPDOWN_LISTS.map((m) => ({ listKey: m.listKey, label: m.label }));
     return { ...cfg, pics: p.data!.filter((x) => x.active).map((x) => x.code), listMeta };
   },
 

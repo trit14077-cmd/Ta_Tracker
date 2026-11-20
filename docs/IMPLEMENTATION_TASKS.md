@@ -97,7 +97,7 @@ Kích cỡ: S ≤ nửa ngày, M ≈ 1–2 ngày, L ≈ 3–5 ngày công của 
 | M6-2 | Hiring checklist + Xác nhận tuyển (khóa/mở lại Admin) | M | – **20/11: 0016 (hiring_state, hire_confirm) + records-save confirm_hire/reopen_hire, kiểm bằng `records-save/hiring.ts` (dùng chung giao diện); hiring.test 10 ca, ops_test thêm 17 check (61). CI xanh (sau sửa kiểu deno check), **0016 đã áp DEV**; người dùng không gọi thẳng hire_confirm. Còn: chạy deploy-dev (records-save mới), PO thử** |
 | M6-3 | Alerts (chuông) | S | – **20/11: 0017 alerts + chép AlertsBell lên thanh đầu trang (bấm hồ sơ mở cửa sổ chi tiết, "Xem công việc" sang màn Công việc). Giai đoạn khớp currentStage 410/410 golden; alerts_test 12 check, thử 6 lỗi cố ý đều bị bắt; ~9 ms trên 20.000 hồ sơ. CI xanh, **0017 đã áp DEV**: Admin thấy 266 hồ sơ Passed/Offer chưa có HR Info (= đếm trực tiếp, DEV chưa có HR Info nào), 133 Offer thiếu giấy tờ; 16 ms; anon không gọi được. Còn: PO thử** |
 | M6-4 | HR Info: Edge `hr-info-save`, `hr-form`, banner (`HrInfoBanner`), trùng CCCD | L | – **20/11: 0018 + Edge hr-info-save, hr-form; chép lại HrInfoBanner nguyên bản (có lại "Link trả lời") + hrService. PO chốt: TA + Admin đều xác nhận/mở lại (như hệ cũ); đọc sheet trả lời làm sau khi có service account Google. hr_test 18, hr-info-save.test 9, deno check 4 function đạt. CI xanh, **0018 đã áp DEV** (DEV chưa có HR Info nào; người dùng chỉ còn quyền đọc hr_info, không gọi thẳng hr_info_write). Còn: deploy-dev, PO thử; tạo service account Google (dùng chung M7-1)** |
-| M6-5 | Audit view (`AuditLogView`), chính sách lưu 12 tháng (`purge_audit` + xuất Drive) | M | – **20/11: 0019 + chép AuditLogView (menu Nhật ký), auditService; audit_test 19 check. Khác hệ cũ: STAGE_MOVE ghi các trường trạng thái đổi (hộp trước/sau xem ở "Lịch sử chuyển vòng" của Kanban). Còn: CI, áp DEV, PO thử; `purge_audit` 12 tháng làm cùng M7 vì phải xuất Drive trước khi xóa (cần service account Google)** |
+| M6-5 | Audit view (`AuditLogView`), chính sách lưu 12 tháng (`purge_audit` + xuất Drive) | M | – **20/11: 0019 + chép AuditLogView (menu Nhật ký), auditService; audit_test 19 check. CI xanh, **0019 đã áp DEV** (list_audit 9 ms; anon không gọi được). Khác hệ cũ: STAGE_MOVE ghi các trường trạng thái đổi (hộp trước/sau xem ở "Lịch sử chuyển vòng" của Kanban). Còn: PO thử; `purge_audit` 12 tháng làm cùng M7 vì phải xuất Drive trước khi xóa (cần service account Google)** |
 
 ## M7 – File, form công khai, import/export
 
@@ -108,7 +108,7 @@ Kích cỡ: S ≤ nửa ngày, M ≈ 1–2 ngày, L ≈ 3–5 ngày công của 
 | M7-3 | Edge `apply-submit` + `apply-info` + trang tuyển dụng tĩnh + inbox (`ApplicationsInbox`) | L | chống spam đạt: SĐT 1 lần/10 phút, ≤120/giờ/link, honeypot |
 | M7-4 | Edge `records-import` + `ImportExcelView` | L | báo lỗi theo dòng; rollback theo lô |
 | M7-5 | Edge `export` (CSV/Sheets) + `sanitizeCellForSpreadsheet` | M | |
-| M7-6 | Admin: Drop-list, Views, cấu hình (ob-target, hr-form) | M | |
+| M7-6 | Admin: Drop-list, Views, cấu hình (ob-target, hr-form) | M | – **20/11: 0020 + chép DropdownAdminView (menu Drop-list, có danh mục PIC như hệ cũ), thẻ cấu hình form HR dưới trang Drop-list (màn Workspace đã bỏ – D-09), adminService/adminCatalog; ob-target đã có ở TaCharts (M5-3). View: hệ cũ không có mục menu nên giữ ẩn, chỉ có RPC. admin_test 32 check; admin-catalog.test 3 (mọi cột dùng Drop-list đều ghi được). Còn: CI, áp DEV, PO thử** |
 | M7-7 | i18n Việt/Anh cho thông báo mới | S | |
 
 ## M8 – Migration (xem MIGRATION_PLAN.md)
