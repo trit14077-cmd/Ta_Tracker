@@ -193,10 +193,6 @@ export function hydrateCandidate(raw: Record<string, unknown>): CandidateRecord 
   return out;
 }
 
-/** Chức năng thuộc giai đoạn sau: báo rõ thay vì giả vờ thành công. */
-const notYet = (what: string, phase: string) =>
-  new ApiError(`${what} chưa có trong hệ thống mới (làm ở ${phase}). Trong thời gian chuyển đổi, vui lòng dùng hệ thống cũ cho việc này.`, 501, 'NOT_AVAILABLE');
-
 type DupRow = { id: number; candidate_code: string; full_name: string; pic: string; position?: string };
 
 /** Lỗi từ Edge Function ({error:{code,message,fields,details}}) -> ApiError mà các màn hình cũ hiểu.
@@ -226,6 +222,35 @@ async function callRecordsSave(body: Record<string, unknown>, fallback: string) 
   if (error) throw await fnError(error, fallback);
   const res = data as { record: Record<string, unknown>; notices?: Record<string, string>; duplicates?: { phone?: DupRow[] } };
   return { candidate: hydrateCandidate(res.record), notices: res.notices || {}, phoneDuplicates: res.duplicates?.phone || [] };
+}
+
+// ----- Edge `files` (M7-1) -----
+async function filesCall<T>(body: Record<string, unknown>, fallback: string): Promise<T> {
+  const { data, error } = await supabase.functions.invoke('files', { body });
+  if (error) throw await fnError(error, fallback);
+  return data as T;
+}
+async function filesUpload(recordId: number, kind: string, file: File, replaceId?: number) {
+  const fd = new FormData();
+  fd.append('op', 'upload');
+  fd.append('record_id', String(recordId));
+  fd.append('kind', kind);
+  if (replaceId) fd.append('file_id', String(replaceId));
+  fd.append('file', file, file.name);
+  const { data, error } = await supabase.functions.invoke('files', { body: fd });
+  if (error) throw await fnError(error, 'Không tải được file lên.');
+  return data as { file: Record<string, unknown>; record: Record<string, unknown> };
+}
+async function filesDownload(body: Record<string, unknown>, fileName: string): Promise<void> {
+  const data = await filesCall<Blob>({ op: 'download', ...body }, 'Không tải được file.');
+  const url = URL.createObjectURL(data instanceof Blob ? data : new Blob([data as BlobPart]));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName || 'file';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 const COLS_KEY = 'ta_col_prefs';
@@ -326,33 +351,37 @@ export const candidateService = {
     await downloadXlsx(`TA_TRACKER_UngVien_${stamp}.xlsx`, [headers, ...rows], 'TA_Tracker_Candidates');
   },
 
-  // ===== file CV / giấy tờ / đính kèm: Edge `files` + Google Drive (D-03) – M7-1 =====
-  async uploadCv(_id: number, _file: File): Promise<CandidateRecord> {
-    throw notYet('Tải file CV', 'M7-1');
+  // ===== file CV / giấy tờ / đính kèm: Edge `files` + Google Drive (M7-1) =====
+  async uploadCv(id: number, file: File): Promise<CandidateRecord> {
+    return hydrateCandidate((await filesUpload(id, 'cv', file)).record);
   },
-  async downloadCv(_id: number, _fileName: string): Promise<void> {
-    throw notYet('Tải xuống CV', 'M7-1');
+  async downloadCv(id: number, fileName: string): Promise<void> {
+    await filesDownload({ record_id: id, kind: 'cv' }, fileName);
   },
-  async deleteCv(_id: number): Promise<CandidateRecord> {
-    throw notYet('Xóa file CV', 'M7-1');
+  async deleteCv(id: number): Promise<CandidateRecord> {
+    return hydrateCandidate((await filesCall<{ record: Record<string, unknown> }>({ op: 'delete', record_id: id, kind: 'cv' }, 'Không xóa được file CV.')).record);
   },
-  async uploadDoc(_id: number, _key: string, _file: File): Promise<CandidateRecord> {
-    throw notYet('Tải giấy tờ', 'M7-1');
+  async uploadDoc(id: number, key: string, file: File): Promise<CandidateRecord> {
+    return hydrateCandidate((await filesUpload(id, key, file)).record);
   },
-  async downloadDoc(_id: number, _key: string, _fileName: string): Promise<void> {
-    throw notYet('Tải xuống giấy tờ', 'M7-1');
+  async downloadDoc(id: number, key: string, fileName: string): Promise<void> {
+    await filesDownload({ record_id: id, kind: key }, fileName);
   },
-  async deleteDoc(_id: number, _key: string): Promise<CandidateRecord> {
-    throw notYet('Xóa giấy tờ', 'M7-1');
+  async deleteDoc(id: number, key: string): Promise<CandidateRecord> {
+    return hydrateCandidate((await filesCall<{ record: Record<string, unknown> }>({ op: 'delete', record_id: id, kind: key }, 'Không xóa được file.')).record);
   },
-  async listAttachments(_candidateId: number): Promise<{ kinds: AttachmentKindInfo[]; attachments: AttachmentInfo[]; max_per_kind: number }> {
-    return { kinds: [], attachments: [], max_per_kind: 20 };
+  async listAttachments(candidateId: number): Promise<{ kinds: AttachmentKindInfo[]; attachments: AttachmentInfo[]; max_per_kind: number }> {
+    return filesCall({ op: 'list', record_id: candidateId }, 'Không tải được danh sách tài liệu.');
   },
-  async uploadAttachment(_candidateId: number, _kind: string, _file: File): Promise<{ message?: string; attachment?: AttachmentInfo }> {
-    throw notYet('Đính kèm file', 'M7-1');
+  async uploadAttachment(candidateId: number, kind: string, file: File, replaceId?: number): Promise<{ message?: string; attachment?: AttachmentInfo }> {
+    const r = await filesUpload(candidateId, kind, file, replaceId);
+    return { attachment: r.file as unknown as AttachmentInfo };
   },
-  async deleteAttachment(_candidateId: number, _attachmentId: number): Promise<void> {
-    throw notYet('Xóa đính kèm', 'M7-1');
+  async downloadAttachment(candidateId: number, attachmentId: number, fileName: string): Promise<void> {
+    await filesDownload({ record_id: candidateId, file_id: attachmentId }, fileName);
+  },
+  async deleteAttachment(candidateId: number, attachmentId: number): Promise<void> {
+    await filesCall({ op: 'delete', record_id: candidateId, file_id: attachmentId }, 'Không xóa được file.');
   },
 
   // ===== Drop-list =====

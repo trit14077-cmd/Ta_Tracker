@@ -61,7 +61,7 @@ export const AttachmentsPanel: React.FC<{ candidateId: number; canEdit: boolean 
     const { kind, replaceId } = target.current;
     if (replaceId) {
       run(`r:${replaceId}`, async () => {
-        await candidateService.uploadAttachment(candidateId, kind, list[0]);
+        await candidateService.uploadAttachment(candidateId, kind, list[0], replaceId);
         return 'Đã thay file.';
       });
       return;
@@ -138,7 +138,9 @@ export const AttachmentsPanel: React.FC<{ candidateId: number; canEdit: boolean 
                       <button
                         type="button"
                         disabled={busy !== ''}
-                        onClick={() => alert(`Tải xuống file: ${a.file_name}`)}
+                        onClick={() =>
+                          candidateService.downloadAttachment(candidateId, a.id, a.file_name).catch((e) => setError(e instanceof Error ? e.message : 'Không tải được file.'))
+                        }
                         className="inline-flex items-center gap-1 text-blue-700 underline disabled:opacity-50"
                       >
                         <Download className="w-3 h-3" /> Tải xuống

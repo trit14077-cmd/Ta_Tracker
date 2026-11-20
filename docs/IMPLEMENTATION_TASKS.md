@@ -103,7 +103,7 @@ Kích cỡ: S ≤ nửa ngày, M ≈ 1–2 ngày, L ≈ 3–5 ngày công của 
 
 | ID | Việc | Cỡ | Hoàn thành khi |
 |---|---|---|---|
-| M7-1 | Edge `files` (CV, 5 giấy tờ, Salary Proposal, Payslips) + kiểm quyền bằng `can_see_record` | L | TA `pic=null` **không** tải được file (lỗ hổng AUDIT §3.2 #1 đóng) |
+| M7-1 | Edge `files` (CV, 5 giấy tờ, Salary Proposal, Payslips) + kiểm quyền bằng `can_see_record` | L | TA `pic=null` **không** tải được file (lỗ hổng AUDIT §3.2 #1 đóng)  – **20/11: Drive qua OAuth Gmail cá nhân (secret GOOGLE_OAUTH_*, thư mục gốc TA_Tracker_Storage; `drive-check` đạt 4/4). 0022 (file_attach/remove/open/list, chỉ service_role, quyền như save_record) + Edge `files` (đuôi, ≤10 MB như form cũ, magic bytes, Rank cho Salary Proposal). files_test 28, files.test vitest. Chưa: đổi tên file khi có Emp_ID, dọn file Drive đã xóa mềm (làm cùng purge). Còn: áp 0022 DEV, deploy `files`, PO thử** |
 | M7-2 | Panel đính kèm/giấy tờ/CV Builder/Translation | M | |
 | M7-3 | Edge `apply-submit` + `apply-info` + trang tuyển dụng tĩnh + inbox (`ApplicationsInbox`) | L | chống spam đạt: SĐT 1 lần/10 phút, ≤120/giờ/link, honeypot |
 | M7-4 | Edge `records-import` + `ImportExcelView` | L | báo lỗi theo dòng; rollback theo lô – **20/11: 0021 + Edge records-import; chép nguyên gasImport.ts + ImportExcelView (menu Nhập Excel, chỉ Admin); SheetJS bản vá 0.20.3 (cdn.sheetjs.com) thay 0.18.5 có lỗ hổng. import_test 15, records-import.test 6. Rollback theo lô: chưa (hệ cũ không có), dữ liệu đã gắn import_batch_id. CI xanh, **0021 đã áp DEV**. Còn: deploy-dev, PO thử** |

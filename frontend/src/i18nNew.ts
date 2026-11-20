@@ -4,6 +4,20 @@
 import { translateText } from '../../shared/i18n.ts';
 
 export const NEW_EN: Record<string, string> = {
+  // ---- file trên Google Drive (Edge files, 0022)
+  'Chưa cấu hình Google Drive cho hệ thống.': 'Google Drive is not set up for the system.',
+  'Chưa chọn file.': 'No file selected.',
+  'Loại tài liệu này không áp dụng cho Rank hiện tại của hồ sơ.': 'This document type does not apply to the current Rank of this profile.',
+  'op phải là upload, download, delete hoặc list.': 'op must be upload, download, delete or list.',
+  'Không kết nối được Google Drive. Vui lòng thử lại sau.': 'Could not connect to Google Drive. Please try again later.',
+  'Loại file không hợp lệ.': 'Invalid file type.',
+  'Chỉ nhận file PDF, Word, Excel (.xlsx) hoặc ảnh (PNG, JPG).': 'Only PDF, Word, Excel (.xlsx) or image (PNG, JPG) files are accepted.',
+  'Chỉ nhận file PDF, Word hoặc ảnh (PNG, JPG).': 'Only PDF, Word or image (PNG, JPG) files are accepted.',
+  'File rỗng.': 'The file is empty.',
+  'Nội dung file không đúng với đuôi file.': 'The file content does not match its extension.',
+  'Thiếu thông tin file.': 'File information is missing.',
+  'Không tìm thấy file cần thay.': 'Could not find the file to replace.',
+  'Đã đủ 20 file cho loại này. Xóa bớt file cũ trước khi tải thêm.': 'This type already has 20 files. Delete some old files before uploading more.',
   // ---- kiểm tra kết nối Google Drive (Edge drive-check)
   'Thiếu secret Google trên Supabase.': 'Google secrets are missing on Supabase.',
   'Đủ 4 secret Google.': 'All 4 Google secrets are set.',
