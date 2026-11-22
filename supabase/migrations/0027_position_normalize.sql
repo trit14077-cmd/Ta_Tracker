@@ -2,8 +2,13 @@
 -- 25 tên đổi (20 tên tiếng Anh -> tên Việt, 5 chỉ khác hoa/thường): đổi trong danh mục, hồ sơ (tăng row_version để form đang mở
 -- báo xung đột thay vì ghi đè tên cũ) và target; 15 vị trí mới trong file được thêm vào danh mục. Mỗi tên đổi ghi 1 dòng nhật ký
 -- DROPDOWN (người thực hiện 'system'). Chạy lại không đổi gì thêm.
+-- Gói trong 1 khối DO: SQL Editor của Supabase có thể chạy từng câu trên kết nối khác nhau nên bảng tạm ngoài khối
+-- không còn ở câu sau (42P01). Trong khối DO, tất cả là 1 lệnh, lỗi ở đâu thì hoàn tác toàn bộ.
 
-create temporary table _pos_ren (old text primary key, new text not null);
+do $$
+begin
+drop table if exists _pos_ren;
+create temporary table _pos_ren (old text primary key, new text not null) on commit drop;
 insert into _pos_ren values
   ('HRIS & HRSS Executive', 'Chuyên viên Tiền lương & Phúc lợi'),
   ('Workforce Business Intelligence Supervisor', 'Giám Sát Phân tích Dữ liệu Nhân sự'),
@@ -70,3 +75,4 @@ select 'position', v.value, true, (select coalesce(max(sort_order), 0) from publ
 on conflict (list_key, value) do nothing;
 
 drop table _pos_ren;
+end $$;
