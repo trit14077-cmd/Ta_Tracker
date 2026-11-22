@@ -104,8 +104,9 @@ export function auditChanges(req: AdminRequest): Record<string, unknown> {
 }
 
 // M9-3: giới hạn kích thước body cho mọi Edge Function (checklist M9-4 "giới hạn body").
-// Đếm byte thật khi đọc luồng – không tin Content-Length (có thể thiếu hoặc sai) – và dừng đọc ngay khi vượt,
-// để client không bắt function giữ cả trăm MB trong bộ nhớ trước khi bị từ chối.
+// Đếm byte thật khi đọc luồng – không tin Content-Length (có thể thiếu hoặc sai) – và ngừng GIỮ byte ngay khi vượt,
+// để client không bắt function giữ cả trăm MB trong bộ nhớ trước khi bị từ chối. Phần còn lại được đọc bỏ
+// (≤ DRAIN_MAX) để runtime gửi được 413 – xem discardRest.
 export const BODY_MAX_JSON = 1024 * 1024; // 1 MB: lưu hồ sơ, HR Info, quản trị, file JSON op
 export const BODY_MAX_IMPORT = 16 * 1024 * 1024; // 1 lô nhập ≤1.500 dòng × 89 cột
 export const BODY_MAX_APPLY = 6 * 1024 * 1024; // CV ≤5 MB + các ô chữ
@@ -118,11 +119,41 @@ export class BodyTooLarge extends Error {
   }
 }
 
+/**
+ * Đọc BỎ phần body còn lại trước khi trả 413. Edge runtime của Supabase không gửi response khi request body chưa
+ * được đọc hết: client kẹt ở bước gửi, function chờ tới WallClockTime (150 s) rồi nền tảng trả 503 không thân
+ * (đo trên DEV 22/11/2026: body 1,1 MB / 7 MB treo; 900 KB đọc hết thì trả ngay). Không giữ byte trong bộ nhớ.
+ * Quá DRAIN_MAX thì cắt luồng (chấp nhận 503 – client hợp lệ đã chặn kích thước trước khi gửi).
+ */
+export const DRAIN_MAX = 32 * 1024 * 1024;
+
+async function discardRest(reader: ReadableStreamDefaultReader<Uint8Array>, seen: number): Promise<void> {
+  try {
+    while (seen <= DRAIN_MAX) {
+      const { done, value } = await reader.read();
+      if (done) return;
+      seen += value.byteLength;
+    }
+    await reader.cancel();
+  } catch {
+    // client ngắt giữa chừng – bỏ qua, vẫn trả 413
+  }
+}
+
 export async function readBodyLimited(req: Request, maxBytes: number): Promise<Uint8Array<ArrayBuffer>> {
   const declared = Number(req.headers.get('Content-Length') ?? '');
-  if (Number.isFinite(declared) && declared > maxBytes) throw new BodyTooLarge();
-  if (!req.body) return new Uint8Array(new ArrayBuffer(0));
+  const declaredTooLarge = Number.isFinite(declared) && declared > maxBytes;
+  if (!req.body) {
+    if (declaredTooLarge) throw new BodyTooLarge();
+    return new Uint8Array(new ArrayBuffer(0));
+  }
   const reader = req.body.getReader();
+  if (declaredTooLarge) {
+    // biết trước là quá cỡ: không giữ gì, chỉ đọc bỏ (hoặc cắt ngay nếu khai quá DRAIN_MAX)
+    if (declared > DRAIN_MAX) await reader.cancel().catch(() => undefined);
+    else await discardRest(reader, 0);
+    throw new BodyTooLarge();
+  }
   const parts: Uint8Array[] = [];
   let total = 0;
   for (;;) {
@@ -130,7 +161,8 @@ export async function readBodyLimited(req: Request, maxBytes: number): Promise<U
     if (done) break;
     total += value.byteLength;
     if (total > maxBytes) {
-      await reader.cancel().catch(() => undefined);
+      parts.length = 0; // nhả phần đã giữ trước khi đọc bỏ phần còn lại
+      await discardRest(reader, total);
       throw new BodyTooLarge();
     }
     parts.push(value);

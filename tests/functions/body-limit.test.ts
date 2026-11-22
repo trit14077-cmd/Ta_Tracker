@@ -1,7 +1,7 @@
 // M9-3: giới hạn kích thước body cho Edge Function (readBodyLimited / readJsonLimited / readFormLimited).
 import { describe, expect, it } from 'vitest';
 import {
-  BODY_MAX_APPLY, BODY_MAX_IMPORT, BODY_MAX_JSON, BODY_MAX_UPLOAD, BodyTooLarge, readBodyLimited, readFormLimited, readJsonLimited,
+  BODY_MAX_APPLY, BODY_MAX_IMPORT, BODY_MAX_JSON, BODY_MAX_UPLOAD, BodyTooLarge, DRAIN_MAX, readBodyLimited, readFormLimited, readJsonLimited,
 } from '../../supabase/functions/admin-users/logic.ts';
 
 const post = (body: BodyInit, headers: Record<string, string> = {}) =>
@@ -49,16 +49,30 @@ describe('readJsonLimited', () => {
 });
 
 describe('readBodyLimited', () => {
-  it('Content-Length khai lớn hơn giới hạn => từ chối trước khi đọc', async () => {
-    const { req, pulled } = streamed(5, 10, { 'Content-Length': '999999' });
+  // Edge runtime Supabase chỉ gửi response khi body đã được đọc hết (DEV 22/11/2026: không đọc ⇒ treo 150 s ⇒ 503).
+  it('Content-Length khai lớn hơn giới hạn => 413, phần body được đọc bỏ hết để runtime trả được response', async () => {
+    const { req, pulled } = streamed(5, 10, { 'Content-Length': '50' });
+    await expect(readBodyLimited(req, 20)).rejects.toBeInstanceOf(BodyTooLarge);
+    expect(pulled()).toBe(5);
+  });
+
+  it('Content-Length khai vượt DRAIN_MAX => cắt luồng ngay, không đọc', async () => {
+    const { req, pulled } = streamed(5, 10, { 'Content-Length': String(DRAIN_MAX + 1) });
     await expect(readBodyLimited(req, 100)).rejects.toBeInstanceOf(BodyTooLarge);
     expect(pulled()).toBe(0);
   });
 
-  it('không có Content-Length: đếm byte thật và DỪNG đọc ngay khi vượt', async () => {
-    const { req, pulled } = streamed(1000, 1024); // ~1 MB nếu đọc hết
+  it('không có Content-Length: vượt giới hạn => 413 sau khi đọc bỏ phần còn lại', async () => {
+    const { req, pulled } = streamed(1000, 1024); // ~1 MB
     await expect(readBodyLimited(req, 4096)).rejects.toBeInstanceOf(BodyTooLarge);
-    expect(pulled()).toBeLessThan(10);
+    expect(pulled()).toBe(1000);
+  });
+
+  it('không có Content-Length: luồng dài quá DRAIN_MAX => đọc bỏ tới DRAIN_MAX rồi cắt', async () => {
+    const chunk = 1024 * 1024;
+    const { req, pulled } = streamed(DRAIN_MAX / chunk + 20, chunk);
+    await expect(readBodyLimited(req, 4096)).rejects.toBeInstanceOf(BodyTooLarge);
+    expect(pulled()).toBe(DRAIN_MAX / chunk + 1);
   });
 
   it('ghép đúng các mảnh khi trong giới hạn', async () => {
