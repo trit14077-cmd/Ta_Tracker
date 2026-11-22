@@ -64,3 +64,22 @@ describe('prepareRows (= kiểm từng dòng của hImportChunk_)', () => {
     expect(r.accepted[0].values.pic).toBeNull();
   });
 });
+
+describe('rollback theo lô (0028) – parseImportRequest', () => {
+  it('batches: limit mặc định 50, tối đa 200', () => {
+    expect(parseImportRequest({ op: 'batches' })).toEqual({ ok: true, req: { op: 'batches', limit: 50 } });
+    expect(parseImportRequest({ op: 'batches', limit: 9999 })).toEqual({ ok: true, req: { op: 'batches', limit: 200 } });
+  });
+  it('rollback mặc định CHẠY THỬ; chỉ dry_run === false mới xóa thật', () => {
+    expect(parseImportRequest({ op: 'rollback', batch_id: 4 })).toEqual({ ok: true, req: { op: 'rollback', batch_id: 4, dry_run: true } });
+    expect(parseImportRequest({ op: 'rollback', batch_id: 4, dry_run: 'false' })).toEqual({ ok: true, req: { op: 'rollback', batch_id: 4, dry_run: true } });
+    expect(parseImportRequest({ op: 'rollback', batch_id: 4, dry_run: 0 })).toEqual({ ok: true, req: { op: 'rollback', batch_id: 4, dry_run: true } });
+    expect(parseImportRequest({ op: 'rollback', batch_id: 4, dry_run: false })).toEqual({ ok: true, req: { op: 'rollback', batch_id: 4, dry_run: false } });
+  });
+  it('rollback thiếu / sai mã lô -> 422', () => {
+    for (const b of [{}, { batch_id: 0 }, { batch_id: 'abc' }, { batch_id: null }]) {
+      const r = parseImportRequest({ op: 'rollback', dry_run: false, ...b });
+      expect(!r.ok && r.error.status).toBe(422);
+    }
+  });
+});

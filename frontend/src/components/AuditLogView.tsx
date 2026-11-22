@@ -95,6 +95,7 @@ export const AuditLogView: React.FC = () => {
             <option value="STAGE_MOVE">STAGE_MOVE (Chuyển vòng Kanban)</option>
             <option value="ARCHIVE">ARCHIVE (Lưu trữ / Khôi phục)</option>
             <option value="IMPORT">IMPORT (Nhập Excel)</option>
+            <option value="IMPORT_ROLLBACK">IMPORT_ROLLBACK (Hoàn tác lô nhập)</option>
             <option value="DROPDOWN">DROPDOWN (Danh mục)</option>
             <option value="USER">USER (Tài khoản)</option>
           </select>

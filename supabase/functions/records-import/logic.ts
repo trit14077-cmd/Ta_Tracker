@@ -8,7 +8,10 @@ import { toDbValues, type ApiError } from '../records-save/logic.ts';
 export const MAX_CHUNK = 1500; // = hệ cũ
 export type ImportRequest =
   | { op: 'chunk'; batch_id: number | null; file_name: string; rows: Record<string, unknown>[]; meta: { sheet?: string; rowNumber?: number }[] }
-  | { op: 'finish'; batch_id: number | null; file_name: string; imported: number; invalid: number; duplicates: number; rejected: number };
+  | { op: 'finish'; batch_id: number | null; file_name: string; imported: number; invalid: number; duplicates: number; rejected: number }
+  // M7-4 rollback theo lô (0028): danh sách lô Excel; chạy thử / gỡ thật hồ sơ chưa bị đụng của 1 lô
+  | { op: 'batches'; limit: number }
+  | { op: 'rollback'; batch_id: number; dry_run: boolean };
 
 const err = (status: number, code: string, message: string): ApiError => ({ status, code, message });
 const int = (v: unknown) => (Number.isFinite(Number(v)) ? Math.max(0, Math.trunc(Number(v))) : 0);
@@ -28,7 +31,15 @@ export function parseImportRequest(body: unknown): { ok: true; req: ImportReques
   if (b.op === 'finish') {
     return { ok: true, req: { op: 'finish', batch_id: batch, file_name: file, imported: int(b.imported), invalid: int(b.invalid), duplicates: int(b.duplicates), rejected: int(b.rejected) } };
   }
-  return { ok: false, error: err(422, 'INVALID_OP', 'op phải là chunk hoặc finish.') };
+  if (b.op === 'batches') {
+    return { ok: true, req: { op: 'batches', limit: Math.min(200, int(b.limit) || 50) } };
+  }
+  if (b.op === 'rollback') {
+    if (!batch) return { ok: false, error: err(422, 'VALIDATION_FAILED', 'Thiếu mã lô nhập.') };
+    // mặc định CHẠY THỬ: chỉ xóa thật khi gửi rõ dry_run = false
+    return { ok: true, req: { op: 'rollback', batch_id: batch, dry_run: b.dry_run !== false } };
+  }
+  return { ok: false, error: err(422, 'INVALID_OP', 'op phải là chunk, finish, batches hoặc rollback.') };
 }
 
 /** Timestamp của file (dd/mm/yyyy [hh:mm[:ss]] hoặc yyyy-mm-dd…) -> ISO giờ VN; không đọc được -> null (DB dùng giờ hiện tại). */

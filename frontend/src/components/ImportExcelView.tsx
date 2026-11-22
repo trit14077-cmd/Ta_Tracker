@@ -12,6 +12,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { FIELD_BY_KEY } from '../../../shared/fieldCatalog.ts';
+import { ImportBatchesPanel } from './ImportBatchesPanel.tsx';
 import { importService as dataService, type ImportPreviewResponse, type ImportRowItem, type ImportStatusResponse } from '../services/importService.ts';
 
 interface ImportExcelViewProps {
@@ -24,6 +25,7 @@ const MAX_UPLOAD_MB = 60;
 
 export const ImportExcelView: React.FC<ImportExcelViewProps> = ({ onImportSuccess }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [batchesKey, setBatchesKey] = useState(0);
   const [loadingPreview, setLoadingPreview] = useState<boolean>(false);
   const [preview, setPreview] = useState<ImportPreviewResponse | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>('');
@@ -156,7 +158,10 @@ export const ImportExcelView: React.FC<ImportExcelViewProps> = ({ onImportSucces
           setStatus(st);
           if (st.state === 'done' || st.state === 'error') {
             stopPolling();
-            if (st.state === 'done') onImportSuccess();
+            if (st.state === 'done') {
+              onImportSuccess();
+              setBatchesKey((k) => k + 1);
+            }
           }
         } catch (err: unknown) {
           stopPolling();
@@ -594,6 +599,8 @@ export const ImportExcelView: React.FC<ImportExcelViewProps> = ({ onImportSucces
           </div>
         </div>
       )}
+
+      <ImportBatchesPanel refreshKey={batchesKey} onChanged={onImportSuccess} />
     </div>
   );
 };

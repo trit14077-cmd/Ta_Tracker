@@ -8,6 +8,26 @@ import { FIELD_CATALOG } from '../../../shared/fieldCatalog.ts';
 import { createGasImport } from './gasImport.ts';
 import { downloadXlsx } from './xlsxDownload.ts';
 
+export interface ImportBatch {
+  id: number;
+  created_at: string;
+  created_by: string;
+  note: string;
+  row_count: number;
+  remaining: number;
+  removable: number;
+  rolled_back_at: string | null;
+  rolled_back_by: string;
+}
+
+export interface ImportRollbackResult {
+  batch_id: number;
+  dry_run: boolean;
+  removed: number;
+  kept_count: number;
+  kept: { id: number; candidate_code: string; full_name: string; reason: 'EDITED' | 'HAS_DATA' }[];
+}
+
 export interface ImportRowItem {
   sheet: string;
   rowNumber: number;
@@ -114,6 +134,18 @@ export const importService = {
   },
   async downloadImportErrors(batchId: string): Promise<void> {
     return engine.downloadErrors(batchId);
+  },
+  // ===== M7-4: hoàn tác theo lô (0028) – chỉ Admin, chỉ lô nhập Excel =====
+  async listImportBatches(): Promise<ImportBatch[]> {
+    const { data, error } = await supabase.functions.invoke('records-import', { body: { op: 'batches' } });
+    if (error) throw await fnError(error, 'Không tải được danh sách lô nhập.');
+    return ((data as { batches?: ImportBatch[] })?.batches) || [];
+  },
+  /** dryRun = true: chỉ xem trước sẽ gỡ/giữ những gì; false: gỡ thật. */
+  async rollbackImportBatch(batchId: number, dryRun: boolean): Promise<ImportRollbackResult> {
+    const { data, error } = await supabase.functions.invoke('records-import', { body: { op: 'rollback', batch_id: batchId, dry_run: dryRun } });
+    if (error) throw await fnError(error, 'Không hoàn tác được lô nhập.');
+    return data as ImportRollbackResult;
   },
   async downloadImportTemplate(): Promise<void> {
     await downloadXlsx('TA_TRACKER_Template_76_Cot.xlsx', [FIELD_CATALOG.map((f) => f.excelHeader)], 'Template_76_Cot');
