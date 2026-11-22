@@ -38,7 +38,7 @@ Claude không kết luận về mặt pháp lý (Nghị định 13/2023 – ARCH
 
 | Mã | Mức | Mô tả | Xử lý | Trạng thái |
 |---|---|---|---|---|
-| S1 | Medium | Không Edge Function nào giới hạn kích thước body; `apply` (công khai) và `files` đọc hết `formData()` rồi mới kiểm 5/10 MB ⇒ có thể bắt function giữ body rất lớn trong bộ nhớ | `readBodyLimited` đếm byte thật, ngừng giữ byte khi vượt; 8 function; 413. Sau deploy 22/11 phát hiện runtime Supabase không gửi response khi body chưa đọc hết (body >1 MB treo 150 s ⇒ 503) ⇒ đọc bỏ phần còn lại (≤ 32 MB, `DRAIN_MAX`) rồi mới trả 413 | Deploy 22/11 (`ba92e16`): smoke `apply: body 7 MB` ⇒ 503 (treo). Bản đọc bỏ: **chờ deploy** rồi chạy lại smoke |
+| S1 | Medium | Không Edge Function nào giới hạn kích thước body; `apply` (công khai) và `files` đọc hết `formData()` rồi mới kiểm 5/10 MB ⇒ có thể bắt function giữ body rất lớn trong bộ nhớ | `readBodyLimited` đếm byte thật, ngừng giữ byte khi vượt; 8 function; 413. Sau deploy 22/11 phát hiện runtime Supabase không gửi response khi body chưa đọc hết (body >1 MB treo 150 s ⇒ 503) ⇒ đọc bỏ phần còn lại (≤ 32 MB, `DRAIN_MAX`) rồi mới trả 413 | Deploy 22/11 (`ba92e16`): smoke `apply: body 7 MB` ⇒ 503 (treo). Bản đọc bỏ deploy `3f25c64` (apply v5): smoke ⇒ **413 PAYLOAD_TOO_LARGE – Đã sửa** |
 | S2 | Medium | Default privileges của `postgres` trong `public` tự cấp TRUNCATE/REFERENCES/TRIGGER/MAINTAIN cho anon + authenticated trên mọi bảng MỚI; TRUNCATE bỏ qua RLS. Bảng hiện có đều đã revoke ⇒ chưa lộ, nhưng migration sau quên revoke là lộ | 0030 thu khỏi default privileges; `security_audit.sql` mục 5 + 7 | **Đã sửa** – 0030 áp DEV 22/11, `security_audit.sql` 0 dòng |
 | S3 | Low | `v_report_rows`: authenticated còn INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER/MAINTAIN (0011 chỉ thu của public/anon). View không cập nhật được nên chưa khai thác được | 0030: chỉ còn SELECT | **Đã sửa** – DEV 22/11 |
 | S4 | Low | 5 hàm schema app còn EXECUTE cho PUBLIC ⇒ anon (không có USAGE schema app ⇒ chưa gọi được) | 0030 thu, cấp rõ lại cho authenticated/service_role | **Đã sửa** – DEV 22/11 |
@@ -53,8 +53,8 @@ Claude không kết luận về mặt pháp lý (Nghị định 13/2023 – ARCH
 ## 4. Việc PO cần làm để đóng M9-3/M9-4
 
 1. ~~Apply migration theo thứ tự **0027 → 0028 → 0029 → 0030** trên DEV; chạy `security_audit.sql` trong SQL Editor ⇒ phải 0 dòng.~~ Xong 22/11: 0 dòng.
-2. Deploy lại toàn bộ Edge Function bằng workflow `deploy-dev` (để trống tên function). Lần 22/11 (`ba92e16`) xong; cần deploy lần nữa cho bản đọc bỏ body (S1).
-3. `npx tsx scripts/security/smoke.ts` ⇒ nhóm Ẩn danh đạt hết (kể cả `apply: body 7 MB` ⇒ 413).
+2. Deploy lại toàn bộ Edge Function bằng workflow `deploy-dev` (để trống tên function). Xong 22/11 (`3f25c64`).
+3. `npx tsx scripts/security/smoke.ts` ⇒ nhóm Ẩn danh đạt hết (kể cả `apply: body 7 MB` ⇒ 413). Xong 22/11: 29 đạt, 0 chưa đạt.
 4. Tạo 1 tài khoản TA thử nghiệm (PIC có hồ sơ giả), ghi `SMOKE_TA_EMAIL`/`SMOKE_TA_PASSWORD` vào `NEW/.env`, chạy lại smoke ⇒ nhóm TA đạt hết. Khóa tài khoản sau khi chạy.
 5. S5, S6 như bảng trên.
 6. Lặp lại bước 1–4 trên PROD trước cutover (MIGRATION_PLAN §8).
