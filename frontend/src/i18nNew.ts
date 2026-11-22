@@ -233,6 +233,7 @@ export const NEW_EN: Record<string, string> = {
   'Phiên đăng nhập không hợp lệ.': 'Invalid sign-in session.',
   'Chỉ nhận POST.': 'POST only.',
   'Nội dung không phải JSON.': 'The request body is not JSON.',
+  'Dữ liệu gửi lên quá lớn.': 'The request is too large.',
   'Thiếu nội dung yêu cầu.': 'Missing request body.',
   'Thiếu hoặc sai record_id.': 'Missing or wrong record_id.',
   'Thiếu data.': 'Missing data.',
@@ -251,6 +252,29 @@ export const NEW_EN: Record<string, string> = {
   'p_periods phải là mảng [[from, to], ...]': 'p_periods must be an array [[from, to], ...]',
   'candidate_code: bắt buộc khi hồ sơ chưa có PIC': 'candidate_code: required when the profile has no PIC',
   'candidate_code: không được để trống': 'candidate_code: must not be empty',
+  // M7-4 hoàn tác theo lô (0028)
+  'IMPORT_ROLLBACK (Hoàn tác lô nhập)': 'IMPORT_ROLLBACK (Undo import batch)',
+  'đã được sửa sau khi nhập': 'edited after the import',
+  'đã có bình luận / công việc / lịch / file / HR info…': 'already has comments / tasks / schedules / files / HR info…',
+  'Không hoàn tác được lô nhập.': 'Could not undo the import batch.',
+  'Không tải được danh sách lô nhập.': 'Could not load the import batches.',
+  'chưa bị sửa': 'not edited',
+  'chưa có dữ liệu kèm theo': 'without attached data',
+  'Lô': 'Batch',
+  'Người nhập': 'Imported by',
+  'Còn trong lô': 'Left in batch',
+  'Gỡ được': 'Removable',
+  'Đang tải…': 'Loading…',
+  'Chưa có lô nhập Excel nào.': 'No Excel import batches yet.',
+  'Hồ sơ được giữ lại:': 'Profiles kept:',
+  'Không còn hồ sơ nào gỡ được trong lô này.': 'No profile in this batch can be removed any more.',
+  'Đang gỡ…': 'Removing…',
+  'Lịch sử nhập và hoàn tác theo lô': 'Import history and undo by batch',
+  'Hoàn tác…': 'Undo…',
+  'Thiếu mã lô nhập.': 'Missing import batch id.',
+  'op phải là chunk, finish, batches hoặc rollback.': 'op must be chunk, finish, batches or rollback.',
+  'Chỉ Admin được hoàn tác lô nhập.': 'Only an Admin can undo an import batch.',
+  'Chỉ hoàn tác được lô nhập Excel (không phải lô chuyển dữ liệu).': 'Only Excel import batches can be undone (not data migration batches).',
 };
 
 // Danh từ trong các câu ghép "Không tải được …" / "Không tìm thấy … hoặc …" / "… chưa có trong hệ thống mới"
@@ -299,6 +323,13 @@ const PATTERNS: [RegExp, (...m: string[]) => string][] = [
   [/^Kỳ không hợp lệ: (.*)$/, (_, k) => `Invalid period: ${k}`],
   [/^Ô Kanban không hợp lệ: (.*)$/, (_, k) => `Invalid Kanban column: ${k}`],
   [/^group_by không hợp lệ: (.*)$/, (_, k) => `Invalid group_by: ${k}`],
+  [/^Đã hoàn tác lô #(\d+): gỡ (\d+) hồ sơ, giữ lại (\d+) hồ sơ\.$/, (_, b, r, k) => `Undid batch #${b}: removed ${r} profiles, kept ${k} profiles.`],
+  [/^Hoàn tác lô nhập #(\d+): gỡ (\d+) hồ sơ, giữ lại (\d+) hồ sơ đã được sửa hoặc có dữ liệu kèm theo\.$/,
+    (_, b, r, k) => `Undo of import batch #${b}: removed ${r} profiles, kept ${k} profiles that were edited or have attached data.`],
+  [/^Hoàn tác lô nhập #(\d+)$/, (_, b) => `Undo import batch #${b}`],
+  [/^Gỡ ([\d.]+) hồ sơ$/, (_, n) => `Remove ${n} profiles`],
+  [/^Đã hoàn tác (.+?)(?: bởi (.+))?$/, (_, t, u) => (u ? `Undone ${t} by ${u}` : `Undone ${t}`)],
+  [/^… và (\d+) hồ sơ khác\.$/, (_, n) => `… and ${n} more profiles.`],
 ];
 
 /** Tiếng Anh cho câu mới của hệ mới; không biết thì trả nguyên văn (giống translateText). */

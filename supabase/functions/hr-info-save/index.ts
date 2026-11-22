@@ -3,7 +3,7 @@
 // shared/hrInfoRules (logic.ts), 4) ghi qua RPC hr_info_write (1 giao dịch, khóa dòng, nhật ký HRINFO).
 // Trả {info} – trùng CCCD trình duyệt đọc lại qua RPC hr_info_get (cần JWT người dùng để che hồ sơ PIC khác).
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
-import { corsHeaders } from '../admin-users/logic.ts';
+import { BODY_MAX_JSON, BodyTooLarge, corsHeaders, readJsonLimited, TOO_LARGE_MESSAGE } from '../admin-users/logic.ts';
 import { mapHrRpcError, parseHrRequest, planHrSave, planHrVerify, type ApiError, type HrCurrent } from './logic.ts';
 
 const URL_ = Deno.env.get('SUPABASE_URL')!;
@@ -28,8 +28,9 @@ Deno.serve(async (req) => {
 
   let body: unknown;
   try {
-    body = await req.json();
-  } catch {
+    body = await readJsonLimited(req, BODY_MAX_JSON) as typeof body;
+  } catch (e) {
+    if (e instanceof BodyTooLarge) return fail({ status: 413, code: 'PAYLOAD_TOO_LARGE', message: TOO_LARGE_MESSAGE });
     return fail({ status: 400, code: 'BAD_JSON', message: 'Nội dung không phải JSON.' });
   }
   const parsed = parseHrRequest(body);

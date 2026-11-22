@@ -6,7 +6,7 @@ Google Sheets chỉ dùng import/export/backup.
 ## Cấu trúc
 - `frontend/` – ứng dụng React + Vite
 - `supabase/` – migrations, RLS policies, seed
-- `docs/` – kế hoạch và tài liệu kiến trúc (ARCHITECTURE, DATABASE_SCHEMA, API_SPEC, MIGRATION_PLAN, IMPLEMENTATION_TASKS)
+- `docs/` – kế hoạch và tài liệu kiến trúc (ARCHITECTURE, DATABASE_SCHEMA, API_SPEC, MIGRATION_PLAN, IMPLEMENTATION_TASKS); vận hành và nghiệm thu (RUNBOOK, USER_GUIDE, ACCEPTANCE_CHECKLIST, SECURITY_REVIEW)
 - `scripts/` – script migration/import/export
 
 ## Phân công

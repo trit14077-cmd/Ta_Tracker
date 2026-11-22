@@ -4,7 +4,7 @@
 // Mỗi lô ≤ 5.000 dòng = 1 file trong thư mục "TA Tracker Nhật ký"; tải lên xong mới xóa đúng các dòng đó (purge_audit).
 // Mỗi lần gọi tối đa 10 lô; còn thì bấm lại. Chỉ Admin.
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
-import { corsHeaders } from '../admin-users/logic.ts';
+import { BODY_MAX_JSON, BodyTooLarge, corsHeaders, readJsonLimited, TOO_LARGE_MESSAGE } from '../admin-users/logic.ts';
 import { DriveError, driveConfigured, ensureFolder, upload } from '../files/drive.ts';
 import { auditCsv, auditFileName, type AuditRow } from './logic.ts';
 
@@ -31,7 +31,12 @@ Deno.serve(async (req) => {
   if (!prof?.active || prof.role !== 'admin') return fail(403, 'FORBIDDEN', 'Chỉ Admin được dọn nhật ký.');
 
   try {
-    const body = await req.json().catch(() => ({})) as { op?: string };
+    let body: { op?: string } = {};
+    try {
+      body = ((await readJsonLimited(req, BODY_MAX_JSON)) ?? {}) as { op?: string };
+    } catch (e) {
+      if (e instanceof BodyTooLarge) return fail(413, 'PAYLOAD_TOO_LARGE', TOO_LARGE_MESSAGE);
+    }
     const { data: before, error: cErr } = await db.rpc('audit_purge_cutoff');
     if (cErr) throw new Error(cErr.message);
 

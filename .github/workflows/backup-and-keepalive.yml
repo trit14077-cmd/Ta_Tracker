@@ -8,7 +8,10 @@
 #     BACKUP_PASSPHRASE   mật khẩu mã hóa file dump – cất riêng ngoài GitHub; mất là không giải mã được.
 #   Tùy chọn (thiếu thì bỏ qua bước đó, không làm fail)
 #     GDRIVE_SA_JSON, GDRIVE_FOLDER_ID   đẩy bản mã hóa lên Drive (xem lưu ý service account ở báo cáo M0-7)
-#     ALERT_TELEGRAM_BOT_TOKEN, ALERT_TELEGRAM_CHAT_ID   nhắn khi fail (GitHub vẫn gửi email khi workflow fail)
+#     ALERT_TELEGRAM_BOT_TOKEN, ALERT_TELEGRAM_CHAT_ID   nhắn khi fail (GitHub vẫn gửi email khi workflow fail),
+#                         cảnh báo dung lượng DB, và tin "vẫn sống" mỗi thứ Hai (M9-6)
+#   Variable tùy chọn: DB_WARN_MB (mặc định 400 = 80% gói Free 500 MB)
+# Canh "quá 36 giờ chưa backup" + "GitHub tự tắt lịch": .github/workflows/backup-watchdog.yml.
 #
 # Không in dữ liệu ra log: chỉ in số dòng theo bảng.
 name: backup-and-keepalive
@@ -41,6 +44,7 @@ jobs:
       GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
       TG_TOKEN: ${{ secrets.ALERT_TELEGRAM_BOT_TOKEN }}
       TG_CHAT: ${{ secrets.ALERT_TELEGRAM_CHAT_ID }}
+      DB_WARN_MB: ${{ vars.DB_WARN_MB || '400' }}
       # DB thử restore (container tạm, mật khẩu không bí mật). SUPABASE_DB_URL có mật khẩu riêng nên không bị PGPASSWORD ảnh hưởng.
       RESTORE_URL: postgresql://postgres@localhost:5432/postgres
       PGPASSWORD: restorecheck
@@ -75,17 +79,51 @@ jobs:
           psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -AtF ' ' -c "$COUNT_SQL" > src_counts.txt
           echo "Số dòng nguồn:"; cat src_counts.txt
 
+      - name: Dung lượng DB (M9-6 – gói Free 500 MB)
+        run: |
+          bytes=$(psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -At -c "select pg_database_size(current_database())")
+          mb=$(( bytes / 1024 / 1024 ))
+          echo "DB_MB=$mb" >> "$GITHUB_ENV"
+          { echo "### Dung lượng DB: ${mb} MB (ngưỡng cảnh báo ${DB_WARN_MB} MB)"; echo; echo '| Bảng | Dung lượng |'; echo '|---|---|';
+            psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -At -F ' | ' -c "select '| ' || n.nspname || '.' || c.relname, pg_size_pretty(pg_total_relation_size(c.oid)) || ' |'
+              from pg_class c join pg_namespace n on n.oid = c.relnamespace
+              where c.relkind = 'r' and n.nspname in ('public','auth','storage') order by pg_total_relation_size(c.oid) desc limit 8"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$mb" -ge "$DB_WARN_MB" ]; then
+            echo "::warning::DB ${mb} MB ≥ ${DB_WARN_MB} MB – xem RUNBOOK §5 (dọn nhật ký 12 tháng / nâng gói)"
+            if [ -n "$TG_TOKEN" ] && [ -n "$TG_CHAT" ]; then
+              curl -s "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" --data-urlencode chat_id="$TG_CHAT" \
+            --data-urlencode text="TA Tracker: DB ${mb} MB, đã vượt ngưỡng ${DB_WARN_MB} MB (gói Free 500 MB)." >/dev/null || true
+            fi
+          fi
+
       - name: pg_dump (schema public + app)
         run: |
-          f="supra_$(date -u +%Y%m%d_%H%M).dump"
-          pg_dump "$SUPABASE_DB_URL" -Fc --no-owner --no-acl --schema=public --schema=app -f "$f"
-          ls -l "$f"
-          echo "DUMP=$f" >> "$GITHUB_ENV"
-          # Không gồm schema auth (tài khoản đăng nhập): tạo lại bằng Edge admin-users (MIGRATION_PLAN §7).
+          base="supra_$(date -u +%Y%m%d_%H%M)"
+          pg_dump "$SUPABASE_DB_URL" -Fc --no-owner --no-acl --schema=public --schema=app -f "$base.dump"
+          echo "DUMP=$base.dump" >> "$GITHUB_ENV"
+          echo "BUNDLE=$base.tar" >> "$GITHUB_ENV"
+          # M9-5: kèm DỮ LIỆU tài khoản đăng nhập (auth.users/identities, mật khẩu đã băm) để phục hồi vào project
+          # Supabase mới mà profiles vẫn khớp id (scripts/ops/restore_supabase.sh). Lỗi bước này chỉ cảnh báo:
+          # bản public/app vẫn được giữ, tài khoản khi đó tạo lại bằng admin-users (MIGRATION_PLAN §7).
+          if pg_dump "$SUPABASE_DB_URL" -Fc --no-owner --no-acl --data-only --table=auth.users --table=auth.identities -f "$base.auth.dump"; then
+            echo "AUTH_DUMP=$base.auth.dump" >> "$GITHUB_ENV"
+          else
+            echo "::warning::Không dump được auth.users/auth.identities – bản backup chỉ có schema public + app"
+            rm -f "$base.auth.dump"
+          fi
+          ls -l "$base".*
 
       - name: Thử restore vào Postgres trống và đối chiếu số dòng
         run: |
           psql "$RESTORE_URL" -v ON_ERROR_STOP=1 -q -f scripts/ops/restore-stubs.sql
+          # FK profiles.id -> auth.users(id): nạp CHỈ id tài khoản vào bảng giả, nếu không bước tạo FK lỗi khi đã có tài khoản
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -At -c "select id from auth.users" > auth_ids.txt
+          psql "$RESTORE_URL" -v ON_ERROR_STOP=1 -q -c "\copy auth.users(id) from 'auth_ids.txt'"
+          rm -f auth_ids.txt
+          if [ -n "${AUTH_DUMP:-}" ]; then
+            pg_restore --list "$AUTH_DUMP" | grep -q "TABLE DATA auth users" || { echo "::error::Bản dump tài khoản không có dữ liệu auth.users"; exit 1; }
+          fi
           pg_restore -d "$RESTORE_URL" --no-owner --no-acl "$DUMP" 2> restore.log || true
           # Chỉ chấp nhận lỗi 'schema "public" already exists' (DB trống luôn có sẵn schema public)
           if grep -E "ERROR:" restore.log | grep -vq 'schema "public" already exists'; then
@@ -98,10 +136,12 @@ jobs:
 
       - name: Mã hóa (AES256)
         run: |
+          # 1 gói = dump public/app + dump tài khoản (nếu có) + số dòng nguồn (restore_supabase.sh dùng để đối chiếu)
+          tar -cf "$BUNDLE" "$DUMP" ${AUTH_DUMP:+"$AUTH_DUMP"} src_counts.txt
           gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" \
-            --symmetric --cipher-algo AES256 -o "$DUMP.gpg" "$DUMP"
-          rm -f "$DUMP" restore.log
-          ls -l "$DUMP.gpg"
+            --symmetric --cipher-algo AES256 -o "$BUNDLE.gpg" "$BUNDLE"
+          rm -f "$DUMP" ${AUTH_DUMP:+"$AUTH_DUMP"} "$BUNDLE" restore.log
+          ls -l "$BUNDLE.gpg"
 
       - name: Đẩy lên Google Drive, giữ 30 bản
         if: env.GDRIVE_SA_JSON != '' && env.GDRIVE_FOLDER_ID != ''
@@ -109,7 +149,7 @@ jobs:
           sudo apt-get install -y -qq rclone
           umask 077; printf '%s' "$GDRIVE_SA_JSON" > sa.json
           rclone config create gd drive scope drive service_account_file sa.json root_folder_id "$GDRIVE_FOLDER_ID" >/dev/null
-          rclone copy "$DUMP.gpg" gd:db-backups
+          rclone copy "$BUNDLE.gpg" gd:db-backups
           rclone lsf gd:db-backups --include "*.gpg" | sort | head -n -30 | xargs -r -I{} rclone deletefile "gd:db-backups/{}"
           rm -f sa.json
 
@@ -117,10 +157,18 @@ jobs:
         if: env.GDRIVE_SA_JSON == '' || env.GDRIVE_FOLDER_ID == ''
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ env.DUMP }}.gpg
-          path: ${{ env.DUMP }}.gpg
+          name: ${{ env.BUNDLE }}.gpg
+          path: ${{ env.BUNDLE }}.gpg
           retention-days: 7
           if-no-files-found: error
+
+      - name: Tin "vẫn sống" mỗi thứ Hai (M9-6 – không thấy tin này là backup/watchdog đã ngừng)
+        if: success() && env.TG_TOKEN != '' && env.TG_CHAT != ''
+        run: |
+          [ "$(TZ=Asia/Ho_Chi_Minh date +%u)" = "1" ] || exit 0
+          recs=$(awk '$1=="recruitment_records"{print $2}' src_counts.txt)
+          curl -s "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" --data-urlencode chat_id="$TG_CHAT" \
+            --data-urlencode text="TA Tracker: backup tuần này bình thường – DB ${DB_MB} MB, ${recs} hồ sơ, restore thử khớp số dòng." >/dev/null
 
       - name: Cảnh báo Telegram khi lỗi
         if: failure() && env.TG_TOKEN != '' && env.TG_CHAT != ''

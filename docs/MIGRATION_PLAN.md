@@ -104,7 +104,7 @@ Quy tắc chung: không nuốt lỗi âm thầm; ETL kết thúc với **bảng 
 
 - **Trước migrate thật**: backup DB đích rỗng (cấu trúc) và bản chụp nguồn (§3.3).
 - **Backup định kỳ sau cutover** (Supabase Free không có backup tự động): `pg_dump` hằng ngày bằng GitHub Actions → lưu ra Drive/khác (mã hóa, giữ ≥30 bản), cộng export Sheets hằng tuần (`backup` Edge Function) để người dùng đọc được bằng Excel. Kết nối DB trực tiếp có thể cần pooler/IPv6 – **kiểm tra trên dev**.
-- **Thử restore** vào project trống và kiểm tra bộ đối chiếu §6 – bắt buộc trước nghiệm thu (tiêu chí "Có thể phục hồi").
+- **Thử restore** vào project trống và kiểm tra bộ đối chiếu §6 – bắt buộc trước nghiệm thu (tiêu chí "Có thể phục hồi"). Thủ tục: RUNBOOK §4.2 (`scripts/ops/restore_supabase.sh`, workflow `restore-drill`).
 - **Rollback trước cutover (M0–M3)**: xóa theo `import_batch_id` hoặc tạo lại project dev; hệ cũ không bị ảnh hưởng.
 - **Rollback sau cutover**: nếu phát hiện lỗi nghiêm trọng trong N ngày đầu ⇒ (1) đóng băng hệ mới, (2) xuất delta đã phát sinh (hồ sơ/ghi chú mới) thành CSV, (3) mở lại hệ cũ ở chế độ ghi, nạp delta thủ công bằng import. Vì vậy hệ cũ giữ **nguyên vẹn, chỉ đọc**, tối thiểu đến khi PO nghiệm thu.
 
@@ -142,3 +142,5 @@ Form ứng tuyển công khai: trong lúc đóng băng, hiển thị trang thôn
 |---|---|---|
 | 0.1 | 19/11/2026 | Bản nháp đầu |
 | 1.0 | 19/11/2026 | Duyệt G1: chốt E1, E3–E5 (không nạp, sửa nguồn); D-09a bỏ Forms; `import_batches` dùng `source`; D-05b; Q10b PO chấp nhận rủi ro; thêm §2.1 kết quả diễn tập 19/11 và việc thay dữ liệu DEV bằng bản ẩn danh |
+| 1.1 | 22/11/2026 | Thứ tự bắt buộc trên DB đích: **áp 0027 (danh mục vị trí 18.11) TRƯỚC khi chạy ETL** – ETL đổi vị trí sang tên chuẩn, thiếu 0027 ⇒ ngoại lệ DM giả (master.ts nay tự dừng); **áp 0029 TRƯỚC khi đối chiếu** (service_role gọi board_counts). §6 được tự động hóa bằng `scripts/migrate/reconcile.ts` (số dòng, từng ô cột không ẩn danh + hash, phân bổ, KPI toàn kỳ / theo PIC / theo nguồn / tháng trước, Kanban, quyền theo pic); phần so tay 200 hồ sơ, File, Comments/Tasks vẫn làm tay (M8 chỉ chuyển bảng Master). M8-4: `master.ts` ghi sổ duyệt `master_exceptions_review.xlsx`, `--prev` để theo dõi lỗi đã sửa giữa các lần chạy |
+| 1.2 | 22/11/2026 | M9-5: gói backup hằng ngày = `supra_*.tar.gpg` (dump public+app, dump dữ liệu `auth.users`/`auth.identities`, `src_counts.txt`) thay cho `supra_*.dump.gpg`; phục hồi vào project Supabase mới: áp migrations rồi nạp dữ liệu (`session_replication_role=replica`), giữ nguyên id + mật khẩu tài khoản (không phải tạo lại bằng admin-users nếu gói có dữ liệu tài khoản). Lớp 2 (xuất Sheets) chờ PO chốt phạm vi và tần suất (§7 ghi hằng tuần, IMPLEMENTATION_TASKS M9-5 ghi hằng ngày) |

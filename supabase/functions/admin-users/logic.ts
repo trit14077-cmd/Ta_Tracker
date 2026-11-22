@@ -103,6 +103,59 @@ export function auditChanges(req: AdminRequest): Record<string, unknown> {
   return rest;
 }
 
+// M9-3: giới hạn kích thước body cho mọi Edge Function (checklist M9-4 "giới hạn body").
+// Đếm byte thật khi đọc luồng – không tin Content-Length (có thể thiếu hoặc sai) – và dừng đọc ngay khi vượt,
+// để client không bắt function giữ cả trăm MB trong bộ nhớ trước khi bị từ chối.
+export const BODY_MAX_JSON = 1024 * 1024; // 1 MB: lưu hồ sơ, HR Info, quản trị, file JSON op
+export const BODY_MAX_IMPORT = 16 * 1024 * 1024; // 1 lô nhập ≤1.500 dòng × 89 cột
+export const BODY_MAX_APPLY = 6 * 1024 * 1024; // CV ≤5 MB + các ô chữ
+export const BODY_MAX_UPLOAD = 11 * 1024 * 1024; // 1 file ≤10 MB + phần bao multipart
+export const TOO_LARGE_MESSAGE = 'Dữ liệu gửi lên quá lớn.';
+
+export class BodyTooLarge extends Error {
+  constructor() {
+    super(TOO_LARGE_MESSAGE);
+  }
+}
+
+export async function readBodyLimited(req: Request, maxBytes: number): Promise<Uint8Array<ArrayBuffer>> {
+  const declared = Number(req.headers.get('Content-Length') ?? '');
+  if (Number.isFinite(declared) && declared > maxBytes) throw new BodyTooLarge();
+  if (!req.body) return new Uint8Array(new ArrayBuffer(0));
+  const reader = req.body.getReader();
+  const parts: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => undefined);
+      throw new BodyTooLarge();
+    }
+    parts.push(value);
+  }
+  const out = new Uint8Array(new ArrayBuffer(total));
+  let at = 0;
+  for (const p of parts) {
+    out.set(p, at);
+    at += p.byteLength;
+  }
+  return out;
+}
+
+/** JSON có giới hạn. Ném BodyTooLarge (→413) hoặc SyntaxError (→400 BAD_JSON). */
+export async function readJsonLimited(req: Request, maxBytes: number): Promise<unknown> {
+  const bytes = await readBodyLimited(req, maxBytes);
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+/** multipart/form-data có giới hạn. Ném BodyTooLarge (→413). */
+export async function readFormLimited(req: Request, maxBytes: number): Promise<FormData> {
+  const bytes = await readBodyLimited(req, maxBytes);
+  return new Response(bytes, { headers: { 'Content-Type': req.headers.get('Content-Type') ?? '' } }).formData();
+}
+
 export function corsHeaders(origin: string | null, allowed: string[]): Record<string, string> {
   const ok = origin && allowed.includes(origin) ? origin : '';
   return {

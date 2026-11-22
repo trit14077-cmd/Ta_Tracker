@@ -21,6 +21,7 @@
     "shared/**/*.ts",
     "tests/**/*.ts",
     "supabase/functions/**/logic.ts",
-    "scripts/migrate/**/*.ts"
+    "scripts/migrate/**/*.ts",
+    "scripts/security/**/*.ts"
   ]
 }

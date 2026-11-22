@@ -4,10 +4,10 @@
 // Biến môi trường: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (Supabase cấp sẵn), ALLOWED_ORIGINS.
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 import {
-  buildConfig, mapRpcError, maskDuplicates, parseRequest, planMove, rowToStrings, toDbValues, validateCreate, validatePatch,
+  buildConfig, checkAccess, checkVersion, mapRpcError, maskDuplicates, parseRequest, planMove, rowToStrings, toDbValues, validateCreate, validatePatch,
   type Actor, type ApiError, type SaveRequest,
 } from './logic.ts';
-import { corsHeaders } from '../admin-users/logic.ts';
+import { BODY_MAX_JSON, BodyTooLarge, corsHeaders, readJsonLimited, TOO_LARGE_MESSAGE } from '../admin-users/logic.ts';
 import { hiringView, planHire, type HiringRow } from './hiring.ts';
 import { renamePlan, type DriveFileRow } from '../files/logic.ts';
 import { driveConfigured, ensurePath, renameMove, trashIfEmpty } from '../files/drive.ts';
@@ -72,8 +72,9 @@ Deno.serve(async (req) => {
 
   let body: unknown;
   try {
-    body = await req.json();
-  } catch {
+    body = await readJsonLimited(req, BODY_MAX_JSON);
+  } catch (e) {
+    if (e instanceof BodyTooLarge) return fail({ status: 413, code: 'PAYLOAD_TOO_LARGE', message: TOO_LARGE_MESSAGE });
     return fail({ status: 400, code: 'BAD_JSON', message: 'Nội dung không phải JSON.' });
   }
   const parsed = parseRequest(body);
@@ -110,8 +111,8 @@ Deno.serve(async (req) => {
 
     // ---------- các thao tác trên hồ sơ có sẵn ----------
     const { data: row } = await db.from('recruitment_records').select('*').eq('id', r.id).maybeSingle();
-    const canSee = row && (actor.role === 'admin' || (!!row.pic && row.pic === actor.pic_code));
-    if (!canSee) return fail({ status: 404, code: 'NOT_FOUND', message: 'Không tìm thấy hồ sơ ứng viên.' });
+    const denied = checkAccess(actor, row);
+    if (denied || !row) return fail(denied ?? { status: 404, code: 'NOT_FOUND', message: 'Không tìm thấy hồ sơ ứng viên.' });
 
     // ---------- M6-2: xác nhận tuyển / mở lại (Ops.gs hHireConfirm_) ----------
     if (r.op === 'confirm_hire' || r.op === 'reopen_hire') {
@@ -131,9 +132,8 @@ Deno.serve(async (req) => {
 
     // các thao tác còn lại đều có expected_version (patch | move | archive | restore)
     const rv = r as Extract<SaveRequest, { expected_version: number }>;
-    if (row.row_version !== rv.expected_version) {
-      return fail({ status: 409, code: 'VERSION_CONFLICT', message: 'Hồ sơ ứng viên này vừa được người dùng khác cập nhật. Vui lòng đối chiếu phiên bản hiện tại trước khi ghi đè.', details: { current: row } });
-    }
+    const stale = checkVersion(row, rv.expected_version);
+    if (stale) return fail(stale);
     const existing = rowToStrings(row);
 
     let changes: Record<string, unknown> = {};

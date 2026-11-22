@@ -3,7 +3,10 @@
 // quản lý auth.users + profiles; người gọi được xác thực bằng JWT của chính họ.
 // Biến môi trường: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (Supabase cấp sẵn), ALLOWED_ORIGINS (danh sách, phân cách dấu phẩy).
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
-import { auditChanges, corsHeaders, finalRoleCheck, parseRequest, selfLockout, usernameToEmail, type ApiError } from './logic.ts';
+import {
+  auditChanges, BODY_MAX_JSON, BodyTooLarge, corsHeaders, finalRoleCheck, parseRequest, readJsonLimited, selfLockout,
+  TOO_LARGE_MESSAGE, usernameToEmail, type ApiError,
+} from './logic.ts';
 
 const URL_ = Deno.env.get('SUPABASE_URL')!;
 const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -33,8 +36,9 @@ Deno.serve(async (req) => {
   // 2) kiểm tra yêu cầu
   let body: unknown;
   try {
-    body = await req.json();
-  } catch {
+    body = await readJsonLimited(req, BODY_MAX_JSON);
+  } catch (e) {
+    if (e instanceof BodyTooLarge) return fail({ status: 413, code: 'PAYLOAD_TOO_LARGE', message: TOO_LARGE_MESSAGE });
     return fail({ status: 400, code: 'BAD_JSON', message: 'Nội dung không phải JSON.' });
   }
   const parsed = parseRequest(body);

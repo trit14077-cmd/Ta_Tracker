@@ -16,6 +16,11 @@ export default tseslint.config(
     languageOptions: { globals: { Deno: 'readonly' } },
   },
   {
+    // kịch bản k6 (M9-2) – chạy bằng k6, không phải Node
+    files: ['scripts/perf/**/*.js'],
+    languageOptions: { globals: { __ENV: 'readonly', __VU: 'readonly', __ITER: 'readonly', open: 'readonly', console: 'readonly' } },
+  },
+  {
     // script chạy bằng Node
     files: ['scripts/**/*.mjs'],
     languageOptions: { globals: { console: 'readonly', process: 'readonly', URL: 'readonly' } },

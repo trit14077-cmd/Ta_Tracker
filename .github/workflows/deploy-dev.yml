@@ -38,11 +38,25 @@ jobs:
         with:
           version: 2.120.0
       - name: Deploy (bundle trên server, kèm thư viện shared/)
+        # Function công khai (người chưa đăng nhập gọi bằng khóa publishable – không phải JWT) phải tắt kiểm JWT ở cổng,
+        # nếu không cổng trả 401 trước khi vào code. Chúng tự chống lạm dụng (apply: rate_limits + honeypot + mã link).
+        # Mọi function khác giữ verify_jwt và còn tự kiểm getUser bên trong.
+        env:
+          PUBLIC_FNS: "apply"
         run: |
+          deploy_one() {
+            local extra=""
+            case " $PUBLIC_FNS " in *" $1 "*) extra="--no-verify-jwt" ;; esac
+            echo "== deploy $1 $extra"
+            supabase functions deploy "$1" --project-ref "$PROJECT_REF" --use-api $extra
+          }
           if [ -n "$FN" ]; then
-            supabase functions deploy "$FN" --project-ref "$PROJECT_REF" --use-api
+            [ -f "supabase/functions/$FN/index.ts" ] || { echo "::error::Không có function $FN"; exit 1; }
+            deploy_one "$FN"
           else
-            supabase functions deploy --project-ref "$PROJECT_REF" --use-api
+            for d in supabase/functions/*/; do
+              [ -f "$d/index.ts" ] && deploy_one "$(basename "$d")"
+            done
           fi
       - name: Danh sách function sau deploy
         run: supabase functions list --project-ref "$PROJECT_REF"

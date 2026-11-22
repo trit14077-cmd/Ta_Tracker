@@ -5,7 +5,7 @@
 //                                Đọc sheet bằng OAuth Gmail của hệ thống (secret GOOGLE_OAUTH_*, chung với Drive – M7-1);
 //                                sheet + tab lấy ở app_settings.hr_form (Admin cấu hình), mặc định như hệ cũ.
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
-import { corsHeaders } from '../admin-users/logic.ts';
+import { BODY_MAX_JSON, BodyTooLarge, corsHeaders, readJsonLimited, TOO_LARGE_MESSAGE } from '../admin-users/logic.ts';
 import { hrEligible } from '../../../shared/hrInfoRules.ts';
 import { HR_FORM_DEFAULT_URL, HR_SHEET_DEFAULT_ID, HR_SHEET_DEFAULT_TAB } from '../../../shared/hrFormMap.ts';
 import { googleConfigured, readSheet, SheetAccessError } from '../files/drive.ts';
@@ -35,8 +35,9 @@ Deno.serve(async (req) => {
 
   let body: Record<string, unknown>;
   try {
-    body = await req.json();
-  } catch {
+    body = await readJsonLimited(req, BODY_MAX_JSON) as typeof body;
+  } catch (e) {
+    if (e instanceof BodyTooLarge) return fail({ status: 413, code: 'PAYLOAD_TOO_LARGE', message: TOO_LARGE_MESSAGE });
     return fail({ status: 400, code: 'BAD_JSON', message: 'Nội dung không phải JSON.' });
   }
   const id = Number(body?.record_id);

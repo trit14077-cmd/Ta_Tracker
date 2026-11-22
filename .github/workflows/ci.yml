@@ -21,6 +21,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # quét lộ khóa trong TOÀN BỘ lịch sử Git (M9-3)
       - uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -36,6 +38,8 @@ jobs:
         run: |
           npm ci --prefix frontend
           npm run build --prefix frontend
+      - name: Quét lộ khóa – bundle frontend + lịch sử Git (M9-3; chỉ in tên mẫu, không in giá trị)
+        run: npx tsx scripts/security/secretScan.ts --bundle frontend/dist --history
 
   edge:
     name: Kiểm kiểu Edge Functions (Deno)
@@ -88,6 +92,11 @@ jobs:
         run: |
           psql -v ON_ERROR_STOP=1 -f supabase/tests/rls_test.sql 2>&1 | tee rls.log
           grep -q "RLS_TEST_PASSED" rls.log
+      - name: Quét catalog bảo mật (M9-4) – RLS, security_invoker, search_path, quyền anon/authenticated
+        run: |
+          psql -v ON_ERROR_STOP=1 -AtF ' | ' -f supabase/tests/security_audit.sql > secaudit.txt
+          if [ -s secaudit.txt ]; then echo "::error::Vi phạm checklist bảo mật:"; cat secaudit.txt; exit 1; fi
+          echo "SECURITY_AUDIT_PASSED"
       - name: Test RPC ghi hồ sơ (tự rollback)
         run: |
           psql -v ON_ERROR_STOP=1 -f supabase/tests/rpc_test.sql 2>&1 | tee rpc.log

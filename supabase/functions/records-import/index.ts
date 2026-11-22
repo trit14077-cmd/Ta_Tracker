@@ -2,8 +2,10 @@
 //   {op:"chunk", batch_id?, file_name, rows[≤1500], meta[]} : kiểm lại từng dòng bằng shared/ (logic.ts), ghi qua RPC
 //      import_records (1 giao dịch, không ghi đè). Lần gọi đầu (chưa có batch_id) tạo lô import_batches và trả batch_id.
 //   {op:"finish", batch_id, file_name, imported, invalid, duplicates, rejected} : 1 dòng nhật ký tổng (import_finish).
+//   {op:"batches", limit?} : danh sách lô Excel (import_batch_list, 0028).
+//   {op:"rollback", batch_id, dry_run?} : hoàn tác lô (import_rollback, 0028); mặc định chạy thử, dry_run:false mới xóa.
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
-import { corsHeaders } from '../admin-users/logic.ts';
+import { BODY_MAX_IMPORT, BodyTooLarge, corsHeaders, readJsonLimited, TOO_LARGE_MESSAGE } from '../admin-users/logic.ts';
 import { buildConfig, mapRpcError, type ApiError } from '../records-save/logic.ts';
 import { parseImportRequest, prepareRows } from './logic.ts';
 
@@ -41,8 +43,9 @@ Deno.serve(async (req) => {
 
   let body: unknown;
   try {
-    body = await req.json();
-  } catch {
+    body = await readJsonLimited(req, BODY_MAX_IMPORT);
+  } catch (e) {
+    if (e instanceof BodyTooLarge) return fail({ status: 413, code: 'PAYLOAD_TOO_LARGE', message: TOO_LARGE_MESSAGE });
     return fail({ status: 400, code: 'BAD_JSON', message: 'Nội dung không phải JSON.' });
   }
   const parsed = parseImportRequest(body);
@@ -50,6 +53,19 @@ Deno.serve(async (req) => {
   const r = parsed.req;
 
   try {
+    if (r.op === 'batches') {
+      const { data, error } = await db.rpc('import_batch_list', { p_actor: prof.id, p_limit: r.limit });
+      if (error) return fail(mapRpcError(error));
+      return json(200, { batches: data ?? [] });
+    }
+    if (r.op === 'rollback') {
+      const { data, error } = await db.rpc('import_rollback', { p_actor: prof.id, p_batch_id: r.batch_id, p_dry_run: r.dry_run });
+      if (error) {
+        const m = mapRpcError(error);
+        return fail(m.code === 'NOT_FOUND' ? { ...m, message: 'Không tìm thấy lô nhập.' } : m);
+      }
+      return json(200, data);
+    }
     if (r.op === 'finish') {
       const { error } = await db.rpc('import_finish', {
         p_actor: prof.id, p_batch_id: r.batch_id, p_file: r.file_name, p_imported: r.imported, p_invalid: r.invalid,

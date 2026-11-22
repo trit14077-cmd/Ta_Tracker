@@ -1,0 +1,66 @@
+# M9-6 – canh workflow backup-and-keepalive: báo động khi
+#   (1) GitHub tự tắt workflow (repo không có commit 60 ngày ⇒ lịch chạy bị tắt) – tự bật lại rồi báo;
+#   (2) lần backup THÀNH CÔNG gần nhất cách đây > 36 giờ (hoặc chưa có lần nào).
+# Báo động = workflow này fail (GitHub gửi email) + Telegram nếu có secrets ALERT_TELEGRAM_*.
+# Lưu ý: chính workflow này cũng có thể bị GitHub tắt cùng lúc ⇒ backup-and-keepalive gửi tin "vẫn sống" mỗi thứ Hai
+# (RUNBOOK §4.3): thứ Hai không thấy tin là phải vào kiểm tra.
+name: backup-watchdog
+on:
+  schedule:
+    - cron: "47 1 * * *" # 01:47 UTC = 08:47 giờ VN, sau giờ backup (02:17 VN)
+  workflow_dispatch: {}
+permissions:
+  actions: write # đọc lịch sử chạy + bật lại workflow backup
+  contents: read
+concurrency:
+  group: backup-watchdog
+  cancel-in-progress: true
+jobs:
+  watch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      WF: backup-and-keepalive.yml
+      MAX_AGE_HOURS: "36"
+      TG_TOKEN: ${{ secrets.ALERT_TELEGRAM_BOT_TOKEN }}
+      TG_CHAT: ${{ secrets.ALERT_TELEGRAM_CHAT_ID }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Workflow backup còn bật không
+        run: |
+          state=$(gh api "repos/$REPO/actions/workflows/$WF" --jq .state)
+          echo "Trạng thái $WF: $state"
+          if [ "$state" != "active" ]; then
+            echo "::error::$WF đang ở trạng thái $state"
+            if gh workflow enable "$WF" --repo "$REPO"; then note="đã tự bật lại"; else note="KHÔNG bật lại được"; fi
+            echo "PROBLEM=workflow backup bị tắt ($state), $note" >> "$GITHUB_ENV"
+          fi
+
+      - name: Lần backup thành công gần nhất
+        run: |
+          last=$(gh run list --repo "$REPO" --workflow "$WF" --status success --limit 1 --json createdAt --jq '.[0].createdAt // empty')
+          msg=""
+          if [ -z "$last" ]; then
+            msg="chưa có lần backup thành công nào"
+          else
+            age=$(( ( $(date -u +%s) - $(date -u -d "$last" +%s) ) / 3600 ))
+            echo "Thành công gần nhất: $last ($age giờ trước)"
+            echo "### Backup thành công gần nhất: $last ($age giờ trước)" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$age" -gt "$MAX_AGE_HOURS" ]; then msg="backup thành công gần nhất cách đây $age giờ (> $MAX_AGE_HOURS giờ)"; fi
+          fi
+          if [ -n "$msg" ]; then
+            echo "::error::$msg"
+            echo "PROBLEM=${PROBLEM:+$PROBLEM; }$msg" >> "$GITHUB_ENV"
+          fi
+
+      - name: Kết luận + báo động
+        run: |
+          if [ -z "$PROBLEM" ]; then echo "Backup bình thường."; exit 0; fi
+          if [ -n "$TG_TOKEN" ] && [ -n "$TG_CHAT" ]; then
+            curl -s "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+              --data-urlencode chat_id="$TG_CHAT" \
+              --data-urlencode text="TA Tracker: CẢNH BÁO backup – $PROBLEM. $RUN_URL" >/dev/null || true
+          fi
+          exit 1

@@ -1,11 +1,18 @@
--- M2-7: 20.000 hồ sơ GIẢ + 5.000 bình luận cho đo hiệu năng. CHỈ chạy trên DB tạm của CI (có COMMIT).
+-- M2-7: 20.000 hồ sơ GIẢ + 5.000 bình luận cho đo hiệu năng. CHỈ chạy trên DB tạm của CI (có COMMIT)
+-- hoặc project Supabase THỬ NGHIỆM riêng cho k6 (M9-2, RUNBOOK §6): psql "$TEST_DB_URL" -v skip_users=1 -f …
+-- (skip_users: không chèn thẳng auth.users – trên Supabase thật tạo user qua admin-users; cần sẵn ≥1 Admin).
+-- KHÔNG chạy trên DEV/PROD.
 -- Sinh cố định (setseed) để các lần chạy so được với nhau.
 select setseed(0.20261119);
 
+\if :{?skip_users}
+\echo 'skip_users: không tạo user giả (dùng Admin có sẵn làm tác giả bình luận)'
+\else
 insert into auth.users (id) values ('00000000-0000-4000-8000-0000000003a0'), ('00000000-0000-4000-8000-0000000003b1');
 insert into public.profiles (id, username, role, pic_code) values
   ('00000000-0000-4000-8000-0000000003a0', 'perf_admin', 'admin', null),
   ('00000000-0000-4000-8000-0000000003b1', 'perf_ta3', 'pic', 'TA3-Thang');
+\endif
 
 with pics as (select array_agg(code order by sort_order) a from public.pics),
      g as (select g, random() r1, random() r2, random() r3, random() r4, random() r5, random() r6 from generate_series(1, 20000) g)
@@ -37,8 +44,11 @@ select
 from g;
 
 insert into public.comments (record_id, author_id, author_username, author_role, body)
-select r.id, '00000000-0000-4000-8000-0000000003a0', 'perf_admin', 'admin', 'Ghi chú ' || r.id
-from public.recruitment_records r where r.id % 4 = 0 or r.id % 3 = 0 and r.pic = 'TA3-Thang';
+select r.id, a.id, a.username, 'admin', 'Ghi chú ' || r.id
+from public.recruitment_records r
+cross join (select id, username from public.profiles where role = 'admin'
+            order by (username = 'perf_admin') desc, username limit 1) a
+where r.id % 4 = 0 or r.id % 3 = 0 and r.pic = 'TA3-Thang';
 
 analyze;
 select (select count(*) from public.recruitment_records) records, (select count(*) from public.comments) comments,

@@ -1,0 +1,74 @@
+# M9-5 – diễn tập PHỤC HỒI bản backup vào project Supabase TRỐNG (bấm tay: Actions > restore-drill > Run workflow).
+# Dùng scripts/ops/restore_supabase.sh (từ chối nếu project đích đã có hồ sơ/tài khoản ⇒ không ghi nhầm DEV/PROD).
+# Secrets:
+#   RESTORE_DB_URL      session pooler URL của project THỬ NGHIỆM trống (không phải DEV/PROD)
+#   BACKUP_PASSPHRASE   như backup-and-keepalive
+#   GDRIVE_SA_JSON, GDRIVE_FOLDER_ID   lấy bản mới nhất trong thư mục db-backups; HOẶC nhập backup_run_id để lấy artifact
+# Sau khi đạt: chạy reconcile.ts với .env trỏ project này (RUNBOOK §4.2), rồi xóa/tạm dừng project thử nghiệm.
+name: restore-drill
+on:
+  workflow_dispatch:
+    inputs:
+      backup_run_id:
+        description: "Run id của backup-and-keepalive có artifact (để trống = lấy bản mới nhất trên Drive)"
+        required: false
+        default: ""
+permissions:
+  contents: read
+  actions: read # tải artifact của lần chạy backup
+concurrency:
+  group: restore-drill
+  cancel-in-progress: false
+jobs:
+  restore:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      TARGET_DB_URL: ${{ secrets.RESTORE_DB_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      GDRIVE_SA_JSON: ${{ secrets.GDRIVE_SA_JSON }}
+      GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+      RUN_ID: ${{ inputs.backup_run_id }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Kiểm tra cấu hình
+        run: |
+          for v in TARGET_DB_URL BACKUP_PASSPHRASE; do [ -n "${!v}" ] || { echo "::error::Thiếu secret cho $v"; exit 1; }; done
+          if [ -z "$RUN_ID" ] && { [ -z "$GDRIVE_SA_JSON" ] || [ -z "$GDRIVE_FOLDER_ID" ]; }; then
+            echo "::error::Chưa cấu hình Drive – nhập backup_run_id"; exit 1
+          fi
+      - name: Cài postgresql-client 17
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+          echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
+      - name: Lấy bản backup
+        run: |
+          mkdir -p bk
+          if [ -n "$RUN_ID" ]; then
+            gh run download "$RUN_ID" --repo "${{ github.repository }}" -D bk
+          else
+            sudo apt-get install -y -qq rclone
+            umask 077; printf '%s' "$GDRIVE_SA_JSON" > sa.json
+            rclone config create gd drive scope drive service_account_file sa.json root_folder_id "$GDRIVE_FOLDER_ID" >/dev/null
+            latest=$(rclone lsf gd:db-backups --include "*.tar.gpg" | sort | tail -1)
+            [ -n "$latest" ] || { echo "::error::Không có gói .tar.gpg trên Drive"; exit 1; }
+            rclone copy "gd:db-backups/$latest" bk
+            rm -f sa.json
+          fi
+          f=$(find bk -name '*.tar.gpg' | sort | tail -1)
+          [ -n "$f" ] || { echo "::error::Không thấy gói .tar.gpg"; exit 1; }
+          echo "BUNDLE=$f" >> "$GITHUB_ENV"
+          echo "Bản dùng để phục hồi: $(basename "$f")"
+      - name: Phục hồi + đối chiếu số dòng
+        run: set -o pipefail; bash scripts/ops/restore_supabase.sh "$BUNDLE" | tee restore.out
+      - name: Tóm tắt
+        if: always()
+        run: |
+          { echo "### Diễn tập phục hồi"; echo; echo '```'; tail -12 restore.out 2>/dev/null; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          rm -rf bk

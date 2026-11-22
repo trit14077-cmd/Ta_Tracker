@@ -6,7 +6,9 @@
 // tối đa APPLY_MAX_PER_HOUR (mặc định 600) hồ sơ/giờ/link; thêm APPLY_MAX_PER_IP (mặc định 60) hồ sơ/giờ/IP.
 // CV lên Drive (thư mục "TA Tracker CV" trong thư mục gốc) TRƯỚC, rồi ghi DB; ghi DB lỗi thì bỏ file vào thùng rác.
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
-import { corsHeaders } from '../admin-users/logic.ts';
+import {
+  BODY_MAX_APPLY, BODY_MAX_JSON, BodyTooLarge, corsHeaders, readFormLimited, readJsonLimited, TOO_LARGE_MESSAGE,
+} from '../admin-users/logic.ts';
 import { driveConfigured, ensureFolder, trash, upload } from '../files/drive.ts';
 import { applyCvFileName, validateApply } from './logic.ts';
 
@@ -36,15 +38,16 @@ Deno.serve(async (req) => {
     const body: Record<string, string> = {};
     let file: File | null = null;
     if (isForm) {
-      const fd = await req.formData();
+      const fd = await readFormLimited(req, BODY_MAX_APPLY);
       for (const [k, v] of fd.entries()) {
         if (typeof v === 'string') body[k] = v;
         else if (k === 'cv') file = v;
       }
     } else {
       try {
-        Object.assign(body, await req.json());
-      } catch {
+        Object.assign(body, await readJsonLimited(req, BODY_MAX_JSON));
+      } catch (e) {
+        if (e instanceof BodyTooLarge) throw e;
         return fail(400, 'BAD_JSON', 'Nội dung không phải JSON.');
       }
     }
@@ -96,6 +99,13 @@ Deno.serve(async (req) => {
     }
     return json(200, { received: true });
   } catch (e) {
+    // body vượt giới hạn: 413 (KHÔNG trả 503 – trang sẽ tự gửi lại mãi). Đọc dừng ngay khi vượt (M9-3).
+    if (e instanceof BodyTooLarge) {
+      const isForm = (req.headers.get('Content-Type') ?? '').startsWith('multipart/form-data');
+      return isForm
+        ? fail(413, 'PAYLOAD_TOO_LARGE', 'Thông tin chưa hợp lệ. Vui lòng kiểm tra lại.', { cv: 'File CV tối đa 5 MB.' })
+        : fail(413, 'PAYLOAD_TOO_LARGE', TOO_LARGE_MESSAGE);
+    }
     console.error('apply', (e as Error).message);
     // lỗi Drive / DB: 503 để trang tự gửi lại (như hệ cũ)
     return fail(503, 'BUSY', 'Hệ thống đang bận. Vui lòng thử lại sau vài giây.');

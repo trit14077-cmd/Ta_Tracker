@@ -8,7 +8,9 @@
 // Edge kiểm loại, đuôi, ≤10 MB, nội dung đúng đuôi (magic bytes), Salary Proposal chỉ Rank 5 trở lên – TRƯỚC khi đưa lên Drive.
 // Thư mục/tên file như hệ cũ (drivePlacement); file cũ khi xóa / thay vào thùng rác Drive (0025 trả `trash`).
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
-import { corsHeaders } from '../admin-users/logic.ts';
+import {
+  BODY_MAX_JSON, BODY_MAX_UPLOAD, BodyTooLarge, corsHeaders, readFormLimited, readJsonLimited, TOO_LARGE_MESSAGE,
+} from '../admin-users/logic.ts';
 import { attachmentKind, attachmentKindApplicable } from '../../../shared/attachmentRules.ts';
 import { ATTACH_KINDS, MAX_PER_KIND, attachmentKinds, checkFile, contentDisposition, drivePlacement } from './logic.ts';
 import { DriveError, download, driveConfigured, ensurePath, trash, upload } from './drive.ts';
@@ -47,15 +49,16 @@ Deno.serve(async (req) => {
     let body: Record<string, unknown> = {};
     let file: File | null = null;
     if (isForm) {
-      const fd = await req.formData();
+      const fd = await readFormLimited(req, BODY_MAX_UPLOAD);
       for (const [k, v] of fd.entries()) {
         if (typeof v === 'string') body[k] = v;
         else if (k === 'file') file = v;
       }
     } else {
       try {
-        body = await req.json();
-      } catch {
+        body = await readJsonLimited(req, BODY_MAX_JSON) as Record<string, unknown>;
+      } catch (e) {
+        if (e instanceof BodyTooLarge) throw e;
         return fail({ status: 400, code: 'BAD_JSON', message: 'Nội dung không phải JSON.' });
       }
     }
@@ -150,6 +153,13 @@ Deno.serve(async (req) => {
 
     return fail({ status: 422, code: 'INVALID_OP', message: 'op phải là upload, download, delete hoặc list.' });
   } catch (e) {
+    // body vượt giới hạn: dừng đọc ngay, không đẩy gì lên Drive (M9-3)
+    if (e instanceof BodyTooLarge) {
+      const isForm = (req.headers.get('Content-Type') ?? '').startsWith('multipart/form-data');
+      return fail(isForm
+        ? { status: 413, code: 'FILE_TOO_LARGE', message: 'File tối đa 10 MB.' }
+        : { status: 413, code: 'PAYLOAD_TOO_LARGE', message: TOO_LARGE_MESSAGE });
+    }
     console.error('files', (e as Error).message);
     if (e instanceof DriveError) return fail({ status: 502, code: 'DRIVE_ERROR', message: 'Không kết nối được Google Drive. Vui lòng thử lại sau.' });
     return fail({ status: 500, code: 'SERVER_ERROR', message: 'Lỗi máy chủ. Vui lòng thử lại.' });
