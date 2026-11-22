@@ -313,6 +313,11 @@ begin
   end; c := c + 1;
   execute 'reset role';
 
+  -- 0029: service_role (script đối chiếu) gọi được hàm kiểm quyền trong schema app; anon vẫn không
+  assert has_schema_privilege('service_role', 'app', 'usage'), 'service_role có USAGE schema app'; c := c + 1;
+  assert has_function_privilege('service_role', 'app.is_admin()', 'execute'), 'service_role gọi app.is_admin'; c := c + 1;
+  assert not has_schema_privilege('anon', 'app', 'usage'), 'anon không có USAGE schema app'; c := c + 1;
+
   if current_setting('rlstest.raise_at_end', true) = 'on' then
     raise exception 'RLS_TEST_PASSED: % check đạt (đã rollback)', c;
   end if;

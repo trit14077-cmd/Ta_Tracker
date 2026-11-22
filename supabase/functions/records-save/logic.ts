@@ -17,6 +17,19 @@ export type SaveRequest =
 
 const err = (status: number, code: string, message: string, extra: Partial<ApiError> = {}): ApiError => ({ status, code, message, ...extra });
 
+/** M4-2: quyền thấy hồ sơ như RLS rr_read (Admin mọi hồ sơ; TA chỉ hồ sơ có pic = pic_code của mình, không thấy pic null).
+ *  Không thấy ⇒ 404 (không lộ hồ sơ có tồn tại). */
+export function checkAccess(actor: Actor, row: { pic?: unknown } | null | undefined): ApiError | null {
+  const ok = !!row && (actor.role === 'admin' || (!!row.pic && !!actor.pic_code && row.pic === actor.pic_code));
+  return ok ? null : err(404, 'NOT_FOUND', 'Không tìm thấy hồ sơ ứng viên.');
+}
+
+/** M4-2: khóa lạc quan – lệch row_version ⇒ 409 VERSION_CONFLICT kèm bản hiện tại (API_SPEC §4.1) cho ConflictResolutionModal. */
+export function checkVersion(row: Record<string, unknown>, expected: number): ApiError | null {
+  if (Number(row.row_version) === expected) return null;
+  return err(409, 'VERSION_CONFLICT', 'Hồ sơ ứng viên này vừa được người dùng khác cập nhật. Vui lòng đối chiếu phiên bản hiện tại trước khi ghi đè.', { details: { current: row } });
+}
+
 export function parseRequest(body: unknown): { ok: true; req: SaveRequest } | { ok: false; error: ApiError } {
   const bad = (m: string) => ({ ok: false as const, error: err(422, 'VALIDATION_FAILED', m) });
   if (!body || typeof body !== 'object') return bad('Thiếu nội dung yêu cầu.');

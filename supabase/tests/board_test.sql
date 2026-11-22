@@ -57,6 +57,28 @@ begin
          <> (select count(*) from jsonb_array_elements(fx -> 'outputs' -> 'perRecord') p where p ->> 'sub' = s);
   assert bad is null, 'board_counts.subs lệch boardSub: ' || coalesce(bad, ''); c := c + 1;
 
+  -- ---------- M5-5: bấm thẻ KPI (PipelineKpiStrip) ⇒ list_candidates(p_box/p_sub) ra đúng số trên thẻ ----------
+  -- ô lớn: số trên thẻ = board_counts.counts[ô].total
+  select string_agg(format('%s: thẻ %s / danh sách %s', k, public.board_counts('') -> 'counts' -> k ->> 'total',
+                           public.list_candidates(1, 10, 'id', 'desc', '', '{}'::jsonb, k) ->> 'total'), '; ')
+    into bad
+    from unnest(array['lead','r1','lusu','r2','ob']) k
+   where (public.board_counts('') -> 'counts' -> k ->> 'total')::int
+         <> (public.list_candidates(1, 10, 'id', 'desc', '', '{}'::jsonb, k) ->> 'total')::int;
+  assert bad is null, 'M5-5 ô KPI lệch danh sách: ' || coalesce(bad, ''); c := c + 1;
+  -- chỉ số phụ (SU, LU, Lead mới, chờ R1, chờ OB…): số trên thẻ = board_counts.subs[s]
+  select string_agg(format('%s: thẻ %s / danh sách %s', s, public.board_counts('') -> 'subs' ->> s,
+                           public.list_candidates(1, 10, 'id', 'desc', '', '{}'::jsonb, '', s) ->> 'total'), '; ')
+    into bad
+    from unnest(array['lead_new','r1_wait','su','lu','r2_passed','r2_failed','r2_canceled','ob_wait']) s
+   where (public.board_counts('') -> 'subs' ->> s)::int
+         <> (public.list_candidates(1, 10, 'id', 'desc', '', '{}'::jsonb, '', s) ->> 'total')::int;
+  assert bad is null, 'M5-5 chỉ số phụ lệch danh sách: ' || coalesce(bad, ''); c := c + 1;
+  -- thẻ R2 gộp nhóm (Passed, Failed, Canceled) = tổng 3 chỉ số phụ
+  assert (public.list_candidates(1, 10, 'id', 'desc', '', '{}'::jsonb, '', 'r2_passed,r2_failed,r2_canceled') ->> 'total')::int
+       = (select sum((public.board_counts('') -> 'subs' ->> s)::int) from unnest(array['r2_passed','r2_failed','r2_canceled']) s),
+    'M5-5 nhóm R2 (Passed/Failed/Canceled) lệch tổng chỉ số phụ'; c := c + 1;
+
   -- ---------- 2. failed_at của thẻ = boardPosition().failedAt ----------
   select string_agg(format('%s: %s/%s', card ->> 'candidate_code', card ->> 'failed_at', coalesce(p -> 'board' ->> 'failedAt', '')), '; ')
     into bad
@@ -105,7 +127,28 @@ begin
   perform set_config('request.jwt.claim.sub', ad::text, true);
   n := (select sum((v ->> 'total')::int) from jsonb_each(public.board_page('{"pic":"PIC-B"}', '') -> 'counts') x(kx, v));
   assert n = (select count(*) from jsonb_array_elements(fx -> 'records') e where e ->> 'pic' = 'PIC-B'), 'Admin lọc PIC-B: ' || n; c := c + 1;
+  -- M5-5: Admin chọn PIC ở đầu trang ⇒ thẻ KPI (board_counts(pic)) = danh sách lọc cùng PIC
+  select string_agg(format('%s: thẻ %s / danh sách %s', k, public.board_counts('PIC-A') -> 'counts' -> k ->> 'total',
+                           public.list_candidates(1, 10, 'id', 'desc', '', '{"pic":"PIC-A"}'::jsonb, k) ->> 'total'), '; ')
+    into bad
+    from unnest(array['lead','r1','lusu','r2','ob']) k
+   where (public.board_counts('PIC-A') -> 'counts' -> k ->> 'total')::int
+         <> (public.list_candidates(1, 10, 'id', 'desc', '', '{"pic":"PIC-A"}'::jsonb, k) ->> 'total')::int;
+  assert bad is null, 'M5-5 Admin lọc PIC-A: ô KPI lệch danh sách: ' || coalesce(bad, ''); c := c + 1;
   perform set_config('request.jwt.claim.sub', ta::text, true);
+  -- M5-5: TA (RLS) ⇒ thẻ KPI = danh sách của chính TA, ở cả ô lớn và chỉ số phụ
+  select string_agg(format('%s: thẻ %s / danh sách %s', k, public.board_counts('') -> 'counts' -> k ->> 'total',
+                           public.list_candidates(1, 10, 'id', 'desc', '', '{}'::jsonb, k) ->> 'total'), '; ')
+    into bad
+    from unnest(array['lead','r1','lusu','r2','ob']) k
+   where (public.board_counts('') -> 'counts' -> k ->> 'total')::int
+         <> (public.list_candidates(1, 10, 'id', 'desc', '', '{}'::jsonb, k) ->> 'total')::int;
+  assert bad is null, 'M5-5 TA: ô KPI lệch danh sách: ' || coalesce(bad, ''); c := c + 1;
+  select string_agg(s, ', ') into bad
+    from unnest(array['lead_new','r1_wait','su','lu','r2_passed','r2_failed','r2_canceled','ob_wait']) s
+   where (public.board_counts('') -> 'subs' ->> s)::int
+         <> (public.list_candidates(1, 10, 'id', 'desc', '', '{}'::jsonb, '', s) ->> 'total')::int;
+  assert bad is null, 'M5-5 TA: chỉ số phụ lệch danh sách: ' || coalesce(bad, ''); c := c + 1;
   n := (select sum((v ->> 'total')::int) from jsonb_each(public.board_page('{"pic":"PIC-B"}', '') -> 'counts') x(kx, v));
   assert n = (select count(*) from jsonb_array_elements(fx -> 'records') e where e ->> 'pic' = 'PIC-A'),
     'TA: bỏ qua lọc PIC, chỉ thấy PIC-A: ' || n; c := c + 1;
