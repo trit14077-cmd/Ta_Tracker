@@ -55,7 +55,9 @@ const STATUS_FIELD_KEYS = new Set([
   'emp_status',
 ]);
 
-const TENOR_BUCKETS = ['<1D', '<3D', '<7D', '<15D', '<30D', '>30D'];
+/** Cột hiển thị mặc định theo số thứ tự (index) trong danh mục trường; 1 = Mã ứng viên, 4 = Họ và tên đã được ghim. */
+const DEFAULT_COLUMN_INDEXES = new Set([4, 5, 6, 7, 8, 13, 15]);
+const TENOR_BUCKETS =['<1D', '<3D', '<7D', '<15D', '<30D', '>30D'];
 
 export const CandidateTableView: React.FC<CandidateTableViewProps> = ({
   user,
@@ -103,7 +105,7 @@ export const CandidateTableView: React.FC<CandidateTableViewProps> = ({
 
   // Search & Filters
   const [localSearch, setLocalSearch] = useState<string>(globalSearch);
-  const [showFilters, setShowFilters] = useState<boolean>(true);
+  const [showFilters, setShowFilters] = useState<boolean>(false); // bộ lọc nâng cao ẩn mặc định, bấm nút để mở
   const [filters, setFilters] = useState<{
     pic: string;
     position: string;
@@ -384,7 +386,8 @@ export const CandidateTableView: React.FC<CandidateTableViewProps> = ({
         (a, b) => (rank.get(a.key) ?? 9999) - (rank.get(b.key) ?? 9999) || a.index - b.index
       );
     }
-    return VISIBLE_FIELDS.filter((f) => !f.pinned && !collapsedGroups[f.sectionId]);
+    // Mặc định: chỉ các cột số 4, 5, 6, 7, 8, 13, 15 của danh mục (cột 1 và 4 được ghim). TA tự thêm cột khác ở "Tùy chỉnh cột".
+    return VISIBLE_FIELDS.filter((f) => !f.pinned && DEFAULT_COLUMN_INDEXES.has(f.index) && !collapsedGroups[f.sectionId]);
   }, [collapsedGroups, colPrefs]);
 
   const [exporting, setExporting] = useState<boolean>(false);
