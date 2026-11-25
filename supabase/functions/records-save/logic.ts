@@ -6,7 +6,15 @@ import { FIELD_CATALOG } from '../../../shared/fieldCatalog.ts';
 
 export interface ApiError { status: number; code: string; message: string; fields?: Record<string, string>; details?: unknown }
 export type Role = 'admin' | 'pic';
-export interface Actor { id: string; role: Role; pic_code: string | null }
+/** managed_pics: PIC được ủy quyền (pic_delegations) – TA quản lý nhóm xem/sửa hồ sơ của các PIC này như của mình. */
+export interface Actor { id: string; role: Role; pic_code: string | null; managed_pics?: string[] }
+
+/** Hồ sơ của PIC này có thuộc phạm vi của actor không (Admin: mọi PIC; TA: PIC mình + PIC được ủy quyền). */
+export function canAccessPic(actor: Actor, pic: unknown): boolean {
+  if (actor.role === 'admin') return true;
+  const p = typeof pic === 'string' ? pic : '';
+  return !!p && !!actor.pic_code && (p === actor.pic_code || (actor.managed_pics ?? []).includes(p));
+}
 
 export type SaveRequest =
   | { op: 'create'; values: Record<string, unknown>; from_application_id?: number }
@@ -20,7 +28,7 @@ const err = (status: number, code: string, message: string, extra: Partial<ApiEr
 /** M4-2: quyền thấy hồ sơ như RLS rr_read (Admin mọi hồ sơ; TA chỉ hồ sơ có pic = pic_code của mình, không thấy pic null).
  *  Không thấy ⇒ 404 (không lộ hồ sơ có tồn tại). */
 export function checkAccess(actor: Actor, row: { pic?: unknown } | null | undefined): ApiError | null {
-  const ok = !!row && (actor.role === 'admin' || (!!row.pic && !!actor.pic_code && row.pic === actor.pic_code));
+  const ok = !!row && canAccessPic(actor, row.pic);
   return ok ? null : err(404, 'NOT_FOUND', 'Không tìm thấy hồ sơ ứng viên.');
 }
 
@@ -132,7 +140,7 @@ export function validateCreate(actor: Actor, values: Record<string, unknown>, cf
 
 /** Sửa: validate trên bản hiện tại + kiểm khóa bước sau vòng rớt (STEP_LOCKED) như hệ cũ. */
 export function validatePatch(actor: Actor, existing: Record<string, string>, changes: Record<string, unknown>, cfg: DropdownConfigBundle): ValidateResult {
-  if (actor.role !== 'admin' && changes.pic !== undefined && changes.pic !== actor.pic_code) {
+  if (actor.role !== 'admin' && changes.pic !== undefined && changes.pic !== actor.pic_code && changes.pic !== existing.pic) {
     return { ok: false, error: err(403, 'FORBIDDEN_PIC_CHANGE', 'Tài khoản PIC không được chuyển hồ sơ sang mã PIC của người khác.') };
   }
   if (actor.role !== 'admin' && changes.candidate_code !== undefined && changes.candidate_code !== existing.candidate_code) {
@@ -188,5 +196,5 @@ export function mapRpcError(e: { code?: string; message?: string; details?: stri
 /** Trùng SĐT: Admin thấy đủ; TA chỉ thấy hồ sơ của PIC mình, hồ sơ PIC khác bị che (maskForeign_ của hệ cũ). */
 export function maskDuplicates(rows: { id: number; candidate_code: string; full_name: string; pic: string | null }[], actor: Actor) {
   if (actor.role === 'admin') return rows;
-  return rows.map((r) => (r.pic && r.pic === actor.pic_code ? r : { id: 0, candidate_code: '(ẩn)', full_name: 'Ứng viên của PIC khác', pic: '' }));
+  return rows.map((r) => (canAccessPic(actor, r.pic) ? r : { id: 0, candidate_code: '(ẩn)', full_name: 'Ứng viên của PIC khác', pic: '' }));
 }

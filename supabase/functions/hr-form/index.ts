@@ -45,7 +45,11 @@ Deno.serve(async (req) => {
 
   try {
     const { data: row } = await db.from('recruitment_records').select('id, candidate_code, pic, phone, r1_status, r1_date, r2_status, r2_date, ob_status, ob_date').eq('id', id).maybeSingle();
-    const canSee = row && (prof.role === 'admin' || (!!row.pic && row.pic === prof.pic_code));
+    const { data: dg } = prof.role === 'pic' && prof.pic_code
+      ? await db.from('pic_delegations').select('managed_pic').eq('manager_pic', prof.pic_code)
+      : { data: [] as { managed_pic: string }[] };
+    const mine = new Set([prof.pic_code, ...(dg ?? []).map((d) => d.managed_pic)]);
+    const canSee = row && (prof.role === 'admin' || (!!row.pic && mine.has(row.pic)));
     if (!canSee) return fail({ status: 404, code: 'NOT_FOUND', message: 'Không tìm thấy hồ sơ ứng viên.' });
 
     const sends = async () => {
