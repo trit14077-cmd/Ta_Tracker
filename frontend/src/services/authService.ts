@@ -11,9 +11,21 @@ export interface UserProfile {
   pic_code: string | null;
   active: boolean;
   can_view_all_targets: boolean;
+  /** PIC được ủy quyền xem/sửa (pic_delegations). Rỗng với tài khoản thường. */
+  managed_pics?: string[];
+  /** Được tạo/quản lý tài khoản Intern (chỉ nhóm TA quản lý). */
+  can_create_interns?: boolean;
 }
 
 const PROFILE_COLS = 'id, username, full_name, role, pic_code, active, can_view_all_targets';
+
+/** Có quyền sửa hồ sơ của PIC này không: Admin, PIC của chính mình, hoặc PIC được ủy quyền. */
+export function canEditPic(user: Pick<UserProfile, 'role' | 'pic_code' | 'managed_pics'>, pic: unknown): boolean {
+  if (user.role === 'admin') return true;
+  const p = String(pic ?? '');
+  if (!p || !user.pic_code) return false;
+  return p === user.pic_code || (user.managed_pics ?? []).includes(p);
+}
 
 function authMessage(raw: string): string {
   const m = raw.toLowerCase();
@@ -31,7 +43,14 @@ async function loadProfile(userId: string): Promise<UserProfile> {
     await supabase.auth.signOut();
     throw new Error('Tài khoản đã bị khóa hoặc chưa được cấp quyền. Vui lòng liên hệ Admin.');
   }
-  return data as UserProfile;
+  const profile = data as UserProfile;
+  if (profile.role === 'pic' && profile.pic_code) {
+    // RLS pd_read: chỉ thấy dòng của chính mình. Lỗi đọc => coi như không có ủy quyền (không chặn đăng nhập).
+    const { data: dg } = await supabase.from('pic_delegations').select('managed_pic, can_create_interns').eq('manager_pic', profile.pic_code);
+    profile.managed_pics = (dg ?? []).map((d) => d.managed_pic as string);
+    profile.can_create_interns = (dg ?? []).some((d) => d.can_create_interns);
+  }
+  return profile;
 }
 
 export const authService = {

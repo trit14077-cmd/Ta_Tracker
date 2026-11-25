@@ -1,7 +1,7 @@
 // M3-2: kiểm tra yêu cầu của Edge admin-users (phần thuần, không cần Deno/DB).
 import { describe, expect, it } from 'vitest';
 import {
-  auditChanges, corsHeaders, finalRoleCheck, parseRequest, selfLockout, usernameToEmail,
+  auditChanges, corsHeaders, finalRoleCheck, internManagerCheck, parseRequest, selfLockout, usernameToEmail,
 } from '../../supabase/functions/admin-users/logic.ts';
 
 const ID = '00000000-0000-4000-8000-000000000001';
@@ -84,5 +84,28 @@ describe('quy tắc nghiệp vụ', () => {
   it('CORS chỉ mở cho origin trong danh sách', () => {
     expect(corsHeaders('https://app.example', ['https://app.example'])['Access-Control-Allow-Origin']).toBe('https://app.example');
     expect(corsHeaders('https://evil.example', ['https://app.example'])['Access-Control-Allow-Origin']).toBe('');
+  });
+
+  describe('TA quản lý nhóm tạo Intern', () => {
+    const me = ID;
+    const other = '00000000-0000-4000-8000-000000000002';
+    const create = (o: Record<string, unknown>) =>
+      ok({ op: 'create', username: 'Intern23-NM.Linh', full_name: 'x', role: 'pic', pic_code: 'Intern23-NM.Linh', temp_password: 'Linh@123', ...o });
+    it('chỉ tạo role pic với PIC Intern', () => {
+      expect(internManagerCheck(me, create({}))).toBeNull();
+      expect(internManagerCheck(me, create({ role: 'admin', pic_code: null }))?.status).toBe(403);
+      expect(internManagerCheck(me, create({ pic_code: 'TA6-T.Thuong' }))?.status).toBe(403);
+    });
+    it('chỉ khóa/đổi tên/đặt lại MK Intern do mình tạo', () => {
+      expect(internManagerCheck(me, ok({ op: 'update', id: other, active: false }), me)).toBeNull();
+      expect(internManagerCheck(me, ok({ op: 'update', id: other, active: false }), null)?.status).toBe(403);
+      expect(internManagerCheck(me, ok({ op: 'reset_password', id: other, temp_password: 'Abcd1234' }), other)?.status).toBe(403);
+      expect(internManagerCheck(me, ok({ op: 'reset_password', id: other, temp_password: 'Abcd1234' }), me)).toBeNull();
+    });
+    it('không đổi role, PIC, target', () => {
+      expect(internManagerCheck(me, ok({ op: 'update', id: other, pic_code: 'TA1-Phat' }), me)?.status).toBe(403);
+      expect(internManagerCheck(me, ok({ op: 'update', id: other, role: 'admin' }), me)?.status).toBe(403);
+      expect(internManagerCheck(me, ok({ op: 'update', id: other, can_view_all_targets: true }), me)?.status).toBe(403);
+    });
   });
 });

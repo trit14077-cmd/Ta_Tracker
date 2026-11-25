@@ -12,7 +12,7 @@ import {
   type DropdownDataResponse,
   type StageHistoryItem,
 } from '../services/candidateService.ts';
-import type { UserProfile } from '../services/authService.ts';
+import { canEditPic, type UserProfile } from '../services/authService.ts';
 import { CandidateDetailModal } from './CandidateDetailModal.tsx';
 
 /**
@@ -64,7 +64,7 @@ interface Props {
 
 export const KanbanBoardView: React.FC<Props> = ({ user, dropdowns, globalSearch, onEditCandidate }) => {
   const isAdmin = user.role === 'admin';
-  const canMove = (card: BoardCard) => isAdmin || (Boolean(user.pic_code) && card.pic === user.pic_code);
+  const canMove = (card: BoardCard) => canEditPic(user, card.pic);
 
   // ---------- filters. The search text comes from the search box of the top bar (the only one on the page); it waits
   // until typing pauses, so one request per pause.
@@ -599,7 +599,7 @@ export const KanbanBoardView: React.FC<Props> = ({ user, dropdowns, globalSearch
         <CandidateDetailModal
           candidate={detail}
           user={user}
-          canEdit={isAdmin || (Boolean(user.pic_code) && String(detail.pic) === user.pic_code)}
+          canEdit={canEditPic(user, detail.pic)}
           busy={detailBusy}
           error={detailError}
           extra={historyBlock}

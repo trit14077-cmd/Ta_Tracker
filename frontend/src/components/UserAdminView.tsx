@@ -8,9 +8,11 @@ import type { UserProfile } from '../services/authService.ts';
 
 interface UserAdminViewProps {
   currentUserId: string;
+  /** TA quản lý nhóm: chỉ tạo/quản lý Intern do mình tạo (không đổi role, PIC, target). */
+  limited?: boolean;
 }
 
-export const UserAdminView: React.FC<UserAdminViewProps> = ({ currentUserId }) => {
+export const UserAdminView: React.FC<UserAdminViewProps> = ({ currentUserId, limited = false }) => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [picOptions, setPicOptions] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -29,14 +31,14 @@ export const UserAdminView: React.FC<UserAdminViewProps> = ({ currentUserId }) =
     setLoading(true);
     try {
       const [list, pics] = await Promise.all([userAdminService.listUsers(), userAdminService.listPicCodes()]);
-      setUsers(list);
-      setPicOptions(pics);
+      setUsers(limited ? list.filter((u) => u.id !== currentUserId) : list);
+      setPicOptions(limited ? pics.filter((p) => /^Intern\d+-/.test(p)) : pics);
     } catch (err: unknown) {
       setMsg({ type: 'error', text: err instanceof Error ? err.message : 'Không tải được danh sách tài khoản.' });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [limited, currentUserId]);
 
   useEffect(() => {
     loadUsers();
@@ -174,6 +176,7 @@ export const UserAdminView: React.FC<UserAdminViewProps> = ({ currentUserId }) =
             />
           </div>
 
+          {!limited && (
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
               Vai trò (Role) *
@@ -187,6 +190,7 @@ export const UserAdminView: React.FC<UserAdminViewProps> = ({ currentUserId }) =
               <option value="admin">Admin (Quản trị viên)</option>
             </select>
           </div>
+          )}
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -295,6 +299,9 @@ export const UserAdminView: React.FC<UserAdminViewProps> = ({ currentUserId }) =
                       )}
                     </td>
                     <td className="py-2.5 px-4">
+                      {limited ? (
+                        <span className="font-mono-tabular" data-no-i18n>{u.pic_code}</span>
+                      ) : (
                       <select
                         value={u.pic_code || ''}
                         disabled={busy}
@@ -308,9 +315,12 @@ export const UserAdminView: React.FC<UserAdminViewProps> = ({ currentUserId }) =
                           </option>
                         ))}
                       </select>
+                      )}
                     </td>
                     <td className="py-2.5 px-4">
-                      {u.role === 'admin' ? (
+                      {limited ? (
+                        <span className="text-slate-400">—</span>
+                      ) : u.role === 'admin' ? (
                         <span className="text-slate-400">Luôn xem</span>
                       ) : (
                         <label className="inline-flex items-center gap-1.5 cursor-pointer">

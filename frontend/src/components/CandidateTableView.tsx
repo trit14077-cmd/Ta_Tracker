@@ -32,7 +32,7 @@ import {
   type DropdownDataResponse,
   ApiError,
 } from '../services/candidateService.ts';
-import type { UserProfile } from '../services/authService.ts';
+import { canEditPic, type UserProfile } from '../services/authService.ts';
 import { StatusChip } from './StatusChip.tsx';
 import { SearchableSelect } from './SearchableSelect.tsx';
 import { ConflictResolutionModal } from './ConflictResolutionModal.tsx';
@@ -244,7 +244,7 @@ export const CandidateTableView: React.FC<CandidateTableViewProps> = ({
 
   const canUserEditRow = (row: CandidateRecord): boolean => {
     if (user.role === 'admin') return true;
-    return Boolean(user.pic_code && String(row.pic) === user.pic_code);
+    return canEditPic(user, row.pic);
   };
 
   const handleSort = (fieldKey: string) => {
