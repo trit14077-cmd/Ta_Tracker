@@ -47,8 +47,7 @@ describe('validateApply', () => {
   });
 });
 
-it('tên file CV trên Drive: UngTuyen_<TA>_<Vị trí>_<SĐT>_<Họ tên>', () => {
-  expect(applyCvFileName('TA3-Thang', 'Kế toán', '912345678', 'Nguyễn/Văn A', 'pdf'))
-    .toBe('UngTuyen_TA3-Thang_Kế toán_912345678_Nguyễn_Văn A.pdf');
-  expect(applyCvFileName('Admin', 'Kế toán', '912345678', 'Nguyễn Văn A', 'pdf')).toBe('UngTuyen_Admin_Kế toán_912345678_Nguyễn Văn A.pdf');
+it('tên file CV trên Drive: <TA>_<Vị trí>_<Họ tên>', () => {
+  expect(applyCvFileName('TA3-Thang', 'Kế toán', 'Nguyễn/Văn A', 'pdf')).toBe('TA3-Thang_Kế toán_Nguyễn_Văn A.pdf');
+  expect(applyCvFileName('Admin', 'Kế toán', 'Nguyễn Văn A', 'pdf')).toBe('Admin_Kế toán_Nguyễn Văn A.pdf');
 });
