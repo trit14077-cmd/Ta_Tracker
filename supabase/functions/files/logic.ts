@@ -61,6 +61,21 @@ export function checkFile(kind: string, name: string, size: number, head: Uint8A
 export const DOCS_ROOT = 'TA Tracker Hồ sơ';
 export const CV_ROOT = 'TA Tracker CV';
 
+/** Thư mục chung cho mọi Intern. */
+export const INTERN_ROOT = 'Intern';
+
+/**
+ * Thư mục cấp 1 theo PIC: mỗi TA một thư mục tên = mã PIC; mọi Intern (mã "Intern<số>-...") dùng chung "Intern".
+ * Hồ sơ chưa có PIC => null (đặt thẳng dưới thư mục gốc như trước).
+ */
+export function picRoot(pic: unknown): string | null {
+  const p = String(pic ?? '').trim();
+  if (!p) return null;
+  if (/^Intern\d+-/.test(p)) return INTERN_ROOT;
+  return p.replace(/[\\/:*?"<>|]/g, '_').slice(0, 100);
+}
+const underPic = (pic: unknown, path: string[]) => { const r = picRoot(pic); return r ? [r, ...path] : path; };
+
 /** Tên file như người dùng tải lên, bỏ ký tự Drive không nhận (= hUploadCv_). */
 export function cleanOriginalName(name: string): string {
   return String(name || '').split(/[\\/]/).pop()!.replace(/[\\/:*?"<>|]/g, '_').slice(0, 120);
@@ -72,12 +87,12 @@ export function cleanOriginalName(name: string): string {
  *  - giấy tờ: "TA Tracker Hồ sơ/<Mã NV hoặc mã UV>_<Họ tên>/<…>_<Tên giấy tờ>.<đuôi>" (hUploadDoc_);
  *  - Salary Proposal / Payslips: cùng thư mục, tên kèm số "<…>_Payslip 3.pdf" (attDriveName_).
  */
-export function drivePlacement(rec: { emp_id?: string; candidate_code?: string; full_name?: string }, kind: string, original: string, attId?: number | null) {
-  if (kind === 'cv') return { path: [CV_ROOT], file: cleanOriginalName(original) };
+export function drivePlacement(rec: { emp_id?: string; candidate_code?: string; full_name?: string; pic?: string }, kind: string, original: string, attId?: number | null) {
+  if (kind === 'cv') return { path: underPic(rec.pic, [CV_ROOT]), file: cleanOriginalName(original) };
   const emp = String(rec.emp_id || ''), code = String(rec.candidate_code || ''), name = String(rec.full_name || '');
   const att = attachmentKind(kind);
   const docName = att ? `${att.docName} ${attId ?? ''}`.trim() : FIELD_CATALOG.find((f) => f.key === kind)?.docName ?? kind;
-  return { path: [DOCS_ROOT, docFolderName(emp, code, name)], file: docFileName(emp, code, name, docName, original) };
+  return { path: underPic(rec.pic, [DOCS_ROOT, docFolderName(emp, code, name)]), file: docFileName(emp, code, name, docName, original) };
 }
 
 export interface DriveFileRow { id: number; kind: string; drive_file_id: string; file_name: string }
@@ -87,7 +102,7 @@ export interface DriveFileRow { id: number; kind: string; drive_file_id: string;
  */
 export function renamePlan(before: Record<string, unknown>, after: Record<string, unknown>, files: DriveFileRow[]) {
   const s = (o: Record<string, unknown>, k: string) => String(o[k] ?? '');
-  const same = ['emp_id', 'candidate_code', 'full_name'].every((k) => s(before, k) === s(after, k));
+  const same = ['emp_id', 'candidate_code', 'full_name', 'pic'].every((k) => s(before, k) === s(after, k));
   const columns: Record<string, string> = {};
   const items: { id: number; drive_file_id: string; file_name: string }[] = [];
   if (same) return { folder: null as string[] | null, columns, items };
@@ -105,7 +120,7 @@ export function renamePlan(before: Record<string, unknown>, after: Record<string
     const want = docFileName(emp, code, name, `${attachmentKind(a.kind)!.docName} ${a.id}`, a.file_name);
     items.push({ id: a.id, drive_file_id: a.drive_file_id, file_name: want });
   }
-  return { folder: [DOCS_ROOT, docFolderName(emp, code, name)], columns, items };
+  return { folder: underPic(after.pic, [DOCS_ROOT, docFolderName(emp, code, name)]), columns, items };
 }
 
 /** Các loại đính kèm (Salary Proposal, Payslips) và loại nào dùng được với Rank của hồ sơ. */

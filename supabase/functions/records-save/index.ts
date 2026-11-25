@@ -161,7 +161,7 @@ Deno.serve(async (req) => {
 
     // tên file giấy tờ theo Mã NV / họ tên mới: cột "<id>|<tên>" đổi trong CÙNG lần lưu (tăng version như mọi trường khác)
     let rename: ReturnType<typeof renamePlan> | null = null;
-    if (r.op === 'patch' && ['emp_id', 'candidate_code', 'full_name'].some((k) => k in changes)) {
+    if (r.op === 'patch' && ['emp_id', 'candidate_code', 'full_name', 'pic'].some((k) => k in changes)) {
       const { data: files } = await db.rpc('file_drive_list', { p_record_id: r.id });
       rename = renamePlan(row as Record<string, unknown>, { ...(row as Record<string, unknown>), ...changes }, (files ?? []) as DriveFileRow[]);
       changes = { ...changes, ...rename.columns };
