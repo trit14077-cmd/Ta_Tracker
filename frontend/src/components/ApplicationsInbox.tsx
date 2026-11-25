@@ -290,6 +290,7 @@ export const ApplicationsInbox: React.FC<Props> = ({ user, dropdowns, onClose, o
                     <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-slate-600" data-no-i18n>
                       <span className="inline-flex items-center gap-1"><Phone className="w-3 h-3 text-slate-400" />{a.phone}</span>
                       {a.email && <span className="inline-flex items-center gap-1"><Mail className="w-3 h-3 text-slate-400" />{a.email}</span>}
+                      {a.position && <span className="inline-flex items-center gap-1 font-semibold text-slate-700" data-no-i18n>{a.position}</span>}
                       {a.area && <span className="inline-flex items-center gap-1"><MapPin className="w-3 h-3 text-slate-400" />{a.area}</span>}
                     </div>
                   </div>

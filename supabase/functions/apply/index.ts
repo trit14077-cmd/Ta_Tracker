@@ -1,6 +1,6 @@
 // Edge Function apply (M7-3, API_SPEC §4.3) – trang tuyển dụng công khai, KHÔNG đăng nhập (chỉ khóa anon của trang).
 //   JSON {op:"info", code}          -> {valid:true, regions} | 404 BAD_LINK          (= hApplyInfo_)
-//   multipart op=submit, code, full_name, phone, email, area, note, consent, website (honeypot), cv (file, ≤5 MB)
+//   multipart op=submit, code, full_name, phone, email, area, position (phải thuộc positions), note, consent, website (honeypot), cv (≤5 MB)
 //                                   -> {received:true[, repeated:true]}               (= hApplySubmit_)
 // Chống spam như hệ cũ: honeypot (giả vờ thành công), 1 lần/SĐT/10 phút (báo đã nhận, không lưu lần 2),
 // tối đa APPLY_MAX_PER_HOUR (mặc định 600) hồ sơ/giờ/link; thêm APPLY_MAX_PER_IP (mặc định 60) hồ sơ/giờ/IP.
@@ -54,10 +54,11 @@ Deno.serve(async (req) => {
 
     const { data: info, error: infoErr } = await db.rpc('apply_info', { p_code: String(body.code ?? '') });
     if (infoErr) throw new Error(infoErr.message);
-    const link = info as { valid: boolean; pic?: string; regions?: unknown[] };
+    const link = info as { valid: boolean; pic?: string; pic_label?: string; regions?: unknown[]; positions?: string[] };
     if (!link.valid) return fail(404, 'BAD_LINK', BAD_LINK);
+    const positions = link.positions ?? [];
 
-    if (body.op === 'info') return json(200, { valid: true, regions: link.regions ?? [] });
+    if (body.op === 'info') return json(200, { valid: true, regions: link.regions ?? [], positions });
     if (body.op !== 'submit') return fail(422, 'INVALID_OP', 'op phải là info hoặc submit.');
 
     // Honeypot: ô người dùng không thấy, máy tự điền => giả vờ thành công
@@ -66,10 +67,11 @@ Deno.serve(async (req) => {
     const bytes = file ? new Uint8Array(await file.arrayBuffer()) : null;
     const v = validateApply(
       {
-        full_name: body.full_name ?? '', phone: body.phone ?? '', email: body.email ?? '', area: body.area ?? '', note: body.note ?? '',
-        consent: body.consent === 'true', website: '',
+        full_name: body.full_name ?? '', phone: body.phone ?? '', email: body.email ?? '', area: body.area ?? '',
+        position: body.position ?? '', note: body.note ?? '', consent: body.consent === 'true', website: '',
       },
       file && bytes ? { name: file.name, size: bytes.byteLength, head: bytes.subarray(0, 8) } : null,
+      positions,
     );
     if (!v.ok) return fail(400, 'VALIDATION_FAILED', 'Thông tin chưa hợp lệ. Vui lòng kiểm tra lại.', v.fields);
 
@@ -86,11 +88,13 @@ Deno.serve(async (req) => {
     if (v.cv && bytes) {
       if (!driveConfigured()) return fail(503, 'BUSY', 'Hệ thống đang bận. Vui lòng thử lại sau vài giây.');
       const folder = await ensureFolder('TA Tracker CV');
-      driveId = await upload(folder, applyCvFileName(v.clean.phone, v.clean.full_name, v.cv.ext), v.cv.mime, bytes.buffer as ArrayBuffer);
+      const taLabel = link.pic_label || 'Admin';
+      driveId = await upload(folder, applyCvFileName(taLabel, v.clean.position, v.clean.phone, v.clean.full_name, v.cv.ext),
+        v.cv.mime, bytes.buffer as ArrayBuffer);
     }
     const { error } = await db.rpc('apply_insert', {
       p_pic: pic, p_full_name: v.clean.full_name, p_phone: v.clean.phone, p_email: v.clean.email, p_area: v.clean.area,
-      p_note: v.clean.note, p_cv_drive_id: driveId, p_cv_name: v.cv?.name ?? '', p_ip: ip,
+      p_position: v.clean.position, p_note: v.clean.note, p_cv_drive_id: driveId, p_cv_name: v.cv?.name ?? '', p_ip: ip,
     });
     if (error) {
       if (driveId) await trash(driveId);

@@ -69,12 +69,13 @@ begin
 
   -- ---------- công khai: chống spam + lưu ----------
   assert public.apply_gate('AP-P1', '902222222', '1.2.3.4', 600, 60) = 'ok', 'lần đầu'; c := c + 1;
-  id1 := public.apply_insert('AP-P1', 'Ứng Viên Một', '902222222', 'a@b.vn', 'Bình Dương', 'note', 'DRV1', 'cv.pdf', '1.2.3.4');
+  id1 := public.apply_insert('AP-P1', 'Ứng Viên Một', '902222222', 'a@b.vn', 'Bình Dương', 'Kế toán', 'note', 'DRV1', 'cv.pdf', '1.2.3.4');
+  assert (select position = 'Kế toán' from public.applications where id = id1), 'lưu vị trí ứng tuyển'; c := c + 1;
   assert public.apply_gate('AP-P1', '902222222', '1.2.3.4', 600, 60) = 'repeated', 'cùng SĐT trong 10 phút'; c := c + 1;
   assert public.apply_gate('AP-P1', '903333333', '1.2.3.4', 1, 60) = 'limited', 'quá N/giờ/link'; c := c + 1;
   assert public.apply_gate('AP-P2', '903333333', '1.2.3.4', 600, 1) = 'limited', 'quá N/giờ/IP'; c := c + 1;
-  id2 := public.apply_insert('AP-P2', 'Ứng Viên Hai', '901111111', '', '', '', '', '', '');
-  id0 := public.apply_insert('', 'Không TA', '904444444', '', '', '', '', '', '');
+  id2 := public.apply_insert('AP-P2', 'Ứng Viên Hai', '901111111', '', '', '', '', '', '', '');
+  id0 := public.apply_insert('', 'Không TA', '904444444', '', '', '', '', '', '', '');
   assert (select pic is null and cv_drive_file_id is null from public.applications where id = id0), 'link chung: chưa gán TA'; c := c + 1;
 
   -- ---------- hộp thư ----------
@@ -124,8 +125,8 @@ begin
   exception when others then assert sqlstate = 'PT404', 'application_cv TA khác: ' || sqlstate; c := c + 1;
   end;
 
-  assert not has_function_privilege('anon', 'public.apply_insert(text,text,text,text,text,text,text,text,text)', 'execute')
-     and not has_function_privilege('authenticated', 'public.apply_insert(text,text,text,text,text,text,text,text,text)', 'execute'), 'apply_insert chỉ Edge'; c := c + 1;
+  assert not has_function_privilege('anon', 'public.apply_insert(text,text,text,text,text,text,text,text,text,text)', 'execute')
+     and not has_function_privilege('authenticated', 'public.apply_insert(text,text,text,text,text,text,text,text,text,text)', 'execute'), 'apply_insert chỉ Edge'; c := c + 1;
   assert not has_function_privilege('anon', 'public.applications_list(text,text,boolean)', 'execute'), 'anon hộp thư'; c := c + 1;
   assert not has_table_privilege('authenticated', 'public.apply_links', 'select'), 'không đọc thẳng mã link'; c := c + 1;
   raise notice 'APPLICATIONS_TEST_PASSED: % check đạt', c;
