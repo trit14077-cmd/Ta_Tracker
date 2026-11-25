@@ -9,6 +9,8 @@ export interface ApplicationForm {
   phone: string;
   email: string;
   area: string;
+  /** Vị trí ứng tuyển: chọn từ dropdown 'position' (danh sách trả về từ checkApplyLink). */
+  position: string;
   note: string;
   consent: boolean;
   /** Hidden honeypot field; people leave it empty. */
@@ -26,6 +28,7 @@ export interface ApplicationItem {
   phone: string;
   email: string;
   area: string;
+  position: string;
   note: string;
   cv_name: string;
   status: 'new' | 'done' | 'skipped';
@@ -67,17 +70,18 @@ export const applicationsService = {
     const c = new URLSearchParams(window.location.search).get('apply') || '';
     return /^[A-Za-z0-9]{12,40}$/.test(c) ? c : '';
   },
-  /** Checks a public application link; returns the regions and provinces where the company recruits. */
-  async checkApplyLink(code: string): Promise<{ regions: { region: string; locations: string[] }[] }> {
+  /** Checks a public application link; returns the regions, provinces and open positions of the company. */
+  async checkApplyLink(code: string): Promise<{ regions: { region: string; locations: string[] }[]; positions: string[] }> {
     const { data, error } = await supabase.functions.invoke('apply', { body: { op: 'info', code } });
     if (error) throw await applyError(error, 'Link ứng tuyển không đúng.');
-    return { regions: (data as { regions?: { region: string; locations: string[] }[] }).regions || [] };
+    const r = data as { regions?: { region: string; locations: string[] }[]; positions?: string[] };
+    return { regions: r.regions || [], positions: r.positions || [] };
   },
   async submitApplication(code: string, form: ApplicationForm): Promise<{ received: boolean }> {
     const fd = new FormData();
     fd.append('op', 'submit');
     fd.append('code', code);
-    for (const k of ['full_name', 'phone', 'email', 'area', 'note', 'website'] as const) fd.append(k, String(form[k] ?? ''));
+    for (const k of ['full_name', 'phone', 'email', 'area', 'position', 'note', 'website'] as const) fd.append(k, String(form[k] ?? ''));
     fd.append('consent', form.consent ? 'true' : 'false');
     if (form.cv) fd.append('cv', form.cv, form.cv.name);
     const { data, error } = await supabase.functions.invoke('apply', { body: fd });

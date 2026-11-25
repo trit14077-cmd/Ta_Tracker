@@ -10,16 +10,19 @@ const CV_MIME: Record<string, string> = {
 };
 
 export interface ApplyInput {
-  full_name: string; phone: string; email: string; area: string; note: string; consent: boolean; website: string;
+  full_name: string; phone: string; email: string; area: string; position: string; note: string; consent: boolean; website: string;
 }
 export interface ApplyClean {
-  full_name: string; phone: string; email: string; area: string; note: string;
+  full_name: string; phone: string; email: string; area: string; position: string; note: string;
 }
 export interface CvInfo { name: string; ext: string; mime: string }
 
-export function validateApply(b: ApplyInput, cv: { name: string; size: number; head: Uint8Array } | null):
+/** `positions`: danh sách vị trí đang mở (dropdown 'position'); vị trí phải nằm trong danh sách này. */
+export function validateApply(b: ApplyInput, cv: { name: string; size: number; head: Uint8Array } | null, positions: string[]):
   { ok: true; clean: ApplyClean; cv: CvInfo | null } | { ok: false; fields: Record<string, string> } {
   const errors: Record<string, string> = {};
+  const position = String(b.position || '').trim();
+  if (!position || !positions.includes(position)) errors.position = 'Vui lòng chọn vị trí ứng tuyển.';
   const name = String(b.full_name || '').replace(/\s+/g, ' ').trim();
   if (!name) errors.full_name = 'Vui lòng nhập họ và tên.';
   else if (name.length > 100) errors.full_name = 'Họ và tên tối đa 100 ký tự.';
@@ -45,10 +48,18 @@ export function validateApply(b: ApplyInput, cv: { name: string; size: number; h
   }
   if (Object.keys(errors).length) return { ok: false, fields: errors };
   const clean = (v: string) => String(sanitizeCellForSpreadsheet(v));
-  return { ok: true, clean: { full_name: clean(name), phone: ph.normalized, email: clean(email), area: clean(area), note: clean(note) }, cv: info };
+  return {
+    ok: true,
+    clean: { full_name: clean(name), phone: ph.normalized, email: clean(email), area: clean(area), position: clean(position), note: clean(note) },
+    cv: info,
+  };
 }
 
-/** Tên file CV trên Drive như hệ cũ: UngTuyen_<SĐT>_<Họ tên>.<đuôi> */
-export function applyCvFileName(phone: string, name: string, ext: string): string {
-  return 'UngTuyen_' + (phone + '_' + name).replace(/[\\/:*?"<>|]/g, '_').slice(0, 80) + '.' + ext;
+/**
+ * Tên file CV trên Drive: UngTuyen_<TA>_<Vị trí>_<SĐT>_<Họ tên>.<đuôi>
+ * <TA> là mã PIC của link (VD TA3-Thang), link chung là Admin. Ví dụ: UngTuyen_TA3-Thang_Kế toán_912345678_Nguyễn Văn A.pdf
+ */
+export function applyCvFileName(taLabel: string, position: string, phone: string, name: string, ext: string): string {
+  const body = [taLabel, position, phone, name].join('_').replace(/[\\/:*?"<>|]/g, '_').slice(0, 100);
+  return 'UngTuyen_' + body + '.' + ext;
 }

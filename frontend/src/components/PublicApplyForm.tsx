@@ -30,7 +30,7 @@ import logoUrl from '../assets/the-supra-logo.png';
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const EXT = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
-type Errors = Partial<Record<'full_name' | 'phone' | 'email' | 'area' | 'note' | 'consent' | 'cv', string>>;
+type Errors = Partial<Record<'full_name' | 'phone' | 'email' | 'area' | 'position' | 'note' | 'consent' | 'cv', string>>;
 type Region = { region: string; locations: string[] };
 
 const NAVY = '#0A2347';
@@ -81,10 +81,12 @@ export const PublicApplyForm: React.FC<{ code: string }> = ({ code }) => {
   const [linkState, setLinkState] = useState<'checking' | 'ok' | 'bad'>('checking');
   const [linkError, setLinkError] = useState('');
   const [regions, setRegions] = useState<Region[]>([]);
+  const [positions, setPositions] = useState<string[]>([]);
   useEffect(() => {
     dataService.checkApplyLink(code).then(
       (r) => {
         setRegions(r.regions);
+        setPositions(r.positions);
         setLinkState('ok');
       },
       (e) => {
@@ -97,7 +99,7 @@ export const PublicApplyForm: React.FC<{ code: string }> = ({ code }) => {
     );
   }, [code]);
 
-  const [form, setForm] = useState<ApplicationForm>({ full_name: '', phone: '', email: '', area: '', note: '', consent: false, website: '' });
+  const [form, setForm] = useState<ApplicationForm>({ full_name: '', phone: '', email: '', area: '', position: '', note: '', consent: false, website: '' });
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
@@ -137,6 +139,7 @@ export const PublicApplyForm: React.FC<{ code: string }> = ({ code }) => {
     if (!form.phone.trim()) e.phone = 'Vui lòng nhập số điện thoại.';
     else if (digits.length < 9 || digits.length > 12) e.phone = 'Số điện thoại chưa đúng (VD: 0912345678).';
     if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = 'Email chưa đúng định dạng.';
+    if (!form.position || !positions.includes(form.position)) e.position = 'Vui lòng chọn vị trí ứng tuyển.';
     if (!form.consent) e.consent = 'Vui lòng đồng ý để chúng tôi lưu và sử dụng thông tin.';
     return e;
   };
@@ -221,6 +224,16 @@ export const PublicApplyForm: React.FC<{ code: string }> = ({ code }) => {
           </div>
           <form onSubmit={submit} noValidate className="px-6 sm:px-8 py-6 space-y-5">
             <div className="grid gap-5 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label htmlFor="ap-position" className={label}>Vị trí ứng tuyển <span className="text-red-600">*</span></label>
+                <select id="ap-position" value={form.position} onChange={(e) => set('position', e.target.value)} className={`${input} ${border('position')}`} aria-invalid={Boolean(errors.position)}>
+                  <option value="">-- Chọn vị trí --</option>
+                  {positions.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+                {err('position')}
+              </div>
               <div>
                 <label htmlFor="ap-name" className={label}>Họ và tên <span className="text-red-600">*</span></label>
                 <input id="ap-name" autoComplete="name" value={form.full_name} onChange={(e) => set('full_name', e.target.value)} placeholder="Nguyễn Văn A" className={`${input} ${border('full_name')}`} maxLength={100} aria-invalid={Boolean(errors.full_name)} />
