@@ -69,6 +69,10 @@ Deno.serve(async (req) => {
   const { data: prof } = await db.from('profiles').select('id, role, pic_code, active').eq('id', who.user.id).maybeSingle();
   if (!prof || !prof.active) return fail({ status: 403, code: 'FORBIDDEN', message: 'Tài khoản đã bị khóa hoặc chưa được cấp quyền.' });
   const actor: Actor = { id: prof.id, role: prof.role, pic_code: prof.pic_code };
+  if (prof.role === 'pic' && prof.pic_code) {
+    const { data: dg } = await db.from('pic_delegations').select('managed_pic').eq('manager_pic', prof.pic_code);
+    actor.managed_pics = (dg ?? []).map((d) => d.managed_pic as string);
+  }
 
   let body: unknown;
   try {

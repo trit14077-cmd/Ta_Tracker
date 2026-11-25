@@ -4,7 +4,7 @@
 // Tầng DB của cùng các ý đã có ở supabase/tests/rpc_test.sql (PT409/PT404/PT403) và rls_test.sql.
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
-  checkAccess, checkVersion, mapRpcError, rowToStrings, validatePatch, type Actor,
+  canAccessPic, checkAccess, checkVersion, mapRpcError, rowToStrings, validatePatch, type Actor,
 } from '../../supabase/functions/records-save/logic.ts';
 import { seedConfig } from '../shared/seedConfig.ts';
 
@@ -123,3 +123,16 @@ describe('M4-2 (4) – `pic` chỉ Admin đổi', () => {
     expect(e.code).toBe('FORBIDDEN');
   });
 });
+
+describe('TA quản lý nhóm (pic_delegations)', () => {
+  const mgr: Actor = { id: 'm', role: 'pic', pic_code: 'TA3-Thang', managed_pics: ['TA6-T.Thuong'] };
+  it('thấy PIC mình và PIC được ủy quyền, không thấy PIC khác/rỗng', () => {
+    expect(canAccessPic(mgr, 'TA3-Thang')).toBe(true);
+    expect(canAccessPic(mgr, 'TA6-T.Thuong')).toBe(true);
+    expect(canAccessPic(mgr, 'TA5-M.Khanh')).toBe(false);
+    expect(canAccessPic(mgr, '')).toBe(false);
+    expect(checkAccess(mgr, { pic: 'TA6-T.Thuong' })).toBeNull();
+    expect(checkAccess(mgr, { pic: 'TA5-M.Khanh' })?.code).toBe('NOT_FOUND');
+  });
+});
+
