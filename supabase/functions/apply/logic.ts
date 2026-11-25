@@ -56,10 +56,10 @@ export function validateApply(b: ApplyInput, cv: { name: string; size: number; h
 }
 
 /**
- * Tên file CV trên Drive: UngTuyen_<TA>_<Vị trí>_<SĐT>_<Họ tên>.<đuôi>
- * <TA> là mã PIC của link (VD TA3-Thang), link chung là Admin. Ví dụ: UngTuyen_TA3-Thang_Kế toán_912345678_Nguyễn Văn A.pdf
+ * Tên file CV trên Drive: <TA>_<Vị trí>_<Họ tên>.<đuôi>
+ * <TA> là mã PIC của link (VD TA3-Thang), link chung là Admin. Ví dụ: TA3-Thang_Kế toán_Nguyễn Văn A.pdf
  */
-export function applyCvFileName(taLabel: string, position: string, phone: string, name: string, ext: string): string {
-  const body = [taLabel, position, phone, name].join('_').replace(/[\\/:*?"<>|]/g, '_').slice(0, 100);
-  return 'UngTuyen_' + body + '.' + ext;
+export function applyCvFileName(taLabel: string, position: string, name: string, ext: string): string {
+  const body = [taLabel, position, name].join('_').replace(/[\\/:*?"<>|]/g, '_').slice(0, 100);
+  return body + '.' + ext;
 }

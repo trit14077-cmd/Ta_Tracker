@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
       if (!driveConfigured()) return fail(503, 'BUSY', 'Hệ thống đang bận. Vui lòng thử lại sau vài giây.');
       const folder = await ensureFolder('TA Tracker CV');
       const taLabel = link.pic_label || 'Admin';
-      driveId = await upload(folder, applyCvFileName(taLabel, v.clean.position, v.clean.phone, v.clean.full_name, v.cv.ext),
+      driveId = await upload(folder, applyCvFileName(taLabel, v.clean.position, v.clean.full_name, v.cv.ext),
         v.cv.mime, bytes.buffer as ArrayBuffer);
     }
     const { error } = await db.rpc('apply_insert', {
