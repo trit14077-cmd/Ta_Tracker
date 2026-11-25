@@ -26,14 +26,16 @@ interface Tile {
   cls: string;
   filter: { box?: BoardCol; sub?: string };
   drop: BoardCol | null;
+  /** Màu chữ của nhãn thẻ, cùng họ màu với viền. */
+  tone: string;
 }
 const TILES: Tile[] = [
-  { key: 'lead', label: 'Lead', hint: 'Chưa Screening', cls: 'border-slate-300 bg-slate-50', filter: { box: 'lead' }, drop: 'lead' },
-  { key: 'r1', label: 'R1', hint: 'Đang ở vòng 1 (Screening)', cls: 'border-sky-300 bg-sky-50', filter: { box: 'r1' }, drop: 'r1' },
-  { key: 'su', label: 'SU', hint: 'Đạt R1, chưa lên lịch R2', cls: 'border-indigo-300 bg-indigo-50', filter: { sub: 'su' }, drop: 'lusu' },
-  { key: 'lu', label: 'LU', hint: 'Đã lên lịch R2, chưa có KQ', cls: 'border-blue-300 bg-blue-50', filter: { sub: 'lu' }, drop: 'r2' },
-  { key: 'r2', label: 'R2', hint: 'Đã có kết quả vòng 2', cls: 'border-violet-300 bg-violet-50', filter: { sub: R2_RESULTS }, drop: null },
-  { key: 'ob', label: 'OB', hint: 'Onboard', cls: 'border-emerald-300 bg-emerald-50', filter: { box: 'ob' }, drop: 'ob' },
+  { key: 'lead', label: 'Lead', hint: 'Chưa Screening', cls: 'border-slate-300 bg-slate-50', tone: 'text-slate-700', filter: { box: 'lead' }, drop: 'lead' },
+  { key: 'r1', label: 'R1', hint: 'Đang ở vòng 1 (Screening)', cls: 'border-sky-300 bg-sky-50', tone: 'text-sky-800', filter: { box: 'r1' }, drop: 'r1' },
+  { key: 'su', label: 'SU', hint: 'Đạt R1, chưa lên lịch R2', cls: 'border-blue-300 bg-blue-50', tone: 'text-blue-800', filter: { sub: 'su' }, drop: 'lusu' },
+  { key: 'lu', label: 'LU', hint: 'Đã lên lịch R2, chưa có KQ', cls: 'border-indigo-300 bg-indigo-50', tone: 'text-indigo-800', filter: { sub: 'lu' }, drop: 'r2' },
+  { key: 'r2', label: 'R2', hint: 'Đã có kết quả vòng 2', cls: 'border-violet-300 bg-violet-50', tone: 'text-violet-800', filter: { sub: R2_RESULTS }, drop: null },
+  { key: 'ob', label: 'OB', hint: 'Onboard', cls: 'border-emerald-300 bg-emerald-50', tone: 'text-emerald-800', filter: { box: 'ob' }, drop: 'ob' },
 ];
 const TILE_OF_DROP: Record<string, string> = { lead: 'Lead', r1: 'R1', lusu: 'SU', r2: 'LU', ob: 'OB' };
 /** Small clickable lines under a card (sub-indicators that are only a part of the card). */
@@ -173,7 +175,7 @@ export const PipelineKpiStrip: React.FC<Props> = ({ pic, refreshKey, dragRef, on
     );
   };
 
-  const card = (t: Tile, compact = false) => {
+  const card = (t: Tile) => {
     const n = numberOf(t);
     const hot = over === t.key;
     const ok = hot && canDrop(t);
@@ -193,7 +195,7 @@ export const PipelineKpiStrip: React.FC<Props> = ({ pic, refreshKey, dragRef, on
           e.preventDefault();
           drop(t);
         }}
-        className={`min-w-0 rounded-lg border-2 ${compact ? 'px-2.5' : 'px-3'} py-2.5 transition-colors hover:shadow-sm flex flex-col ${t.cls} ${on ? '!border-blue-600 ring-2 ring-blue-200' : ''} ${ok ? '!border-emerald-500 ring-2 ring-emerald-200' : ''} ${refused ? '!border-red-400 ring-2 ring-red-100' : ''} ${busy ? 'opacity-60' : ''}`}
+        className={`min-w-0 rounded-lg border-2 px-3 py-2.5 transition-colors hover:shadow-sm flex flex-col h-full ${t.cls} ${on ? '!border-blue-600 ring-2 ring-blue-200' : ''} ${ok ? '!border-emerald-500 ring-2 ring-emerald-200' : ''} ${refused ? '!border-red-400 ring-2 ring-red-100' : ''} ${busy ? 'opacity-60' : ''}`}
       >
         <button
           type="button"
@@ -203,18 +205,21 @@ export const PipelineKpiStrip: React.FC<Props> = ({ pic, refreshKey, dragRef, on
           className="text-left w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 rounded"
         >
           <span className="flex items-baseline justify-between gap-2">
-            <span className="text-sm font-bold text-slate-900 whitespace-nowrap">{t.label}</span>
-            <span className={`${compact ? 'text-xl' : 'text-2xl'} font-extrabold tracking-tight text-slate-900`} data-no-i18n>
+            <span className={`text-sm font-bold whitespace-nowrap ${t.tone}`}>{t.label}</span>
+            <span className="text-2xl font-extrabold tracking-tight text-slate-900 tabular-nums" data-no-i18n>
               {n === null ? '—' : n.toLocaleString('vi-VN')}
             </span>
           </span>
-          <span className="block text-[11px] text-slate-600 leading-tight">{t.hint}</span>
-          {failed > 0 && <span className="block text-[11px] font-semibold text-red-700 mt-0.5">{failed} đã rớt</span>}
+          <span className="block min-h-[2rem] text-[11px] text-slate-600 leading-4">{t.hint}</span>
+          <span className="block min-h-[1rem] text-[11px] font-semibold text-red-700 leading-4">{failed > 0 ? `${failed} đã rớt` : ''}</span>
         </button>
-        {subs && LINES[t.key] && (
-          <div className="mt-1.5 pt-1.5 border-t border-black/10 space-y-0.5">{LINES[t.key]!.map((k) => subButton(k, false))}</div>
-        )}
-        {subs && t.key === 'r2' && <div className="mt-1.5 pt-1.5 border-t border-black/10 grid grid-cols-3 gap-1">{R2_TILES.map((k) => subButton(k, true))}</div>}
+        {/* Chân thẻ: luôn dính đáy, cùng chiều cao ở mọi thẻ để các dòng thẳng hàng */}
+        <div className="mt-auto pt-1.5">
+          <div className="min-h-[2.75rem] border-t border-black/10 pt-1.5">
+            {subs && LINES[t.key] && <div className="space-y-0.5">{LINES[t.key]!.map((k) => subButton(k, false))}</div>}
+            {subs && t.key === 'r2' && <div className="grid grid-cols-3 gap-1">{R2_TILES.map((k) => subButton(k, true))}</div>}
+          </div>
+        </div>
       </div>
     );
   };
@@ -224,19 +229,11 @@ export const PipelineKpiStrip: React.FC<Props> = ({ pic, refreshKey, dragRef, on
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
-        {card(tile('lead'))}
-        {card(tile('r1'))}
-        {/* SU and LU: two small cards in the place of one */}
-        <div className="grid grid-cols-2 gap-2 min-w-0">
-          {card(tile('su'), true)}
-          {card(tile('lu'), true)}
-        </div>
-        {card(tile('r2'))}
-        {card(tile('ob'))}
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 items-stretch">
+        {(['lead', 'r1', 'su', 'lu', 'r2', 'ob'] as TileKey[]).map((k) => card(tile(k)))}
       </div>
       {filterLabel ? (
-        <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 text-xs rounded border border-blue-200 bg-blue-50 text-blue-900">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1.5 text-xs leading-5 rounded border border-blue-200 bg-blue-50 text-blue-900">
           <span>
             Đang xem: <strong>{filterLabel}</strong>. Kéo dòng sang thẻ khác khi ứng viên đạt yêu cầu.
           </span>
@@ -249,12 +246,16 @@ export const PipelineKpiStrip: React.FC<Props> = ({ pic, refreshKey, dragRef, on
           </button>
         </div>
       ) : (
-        <p className="text-[11px] text-slate-500">
-          Bấm vào một thẻ để chỉ xem ứng viên ở đó. Kéo dòng ứng viên thả vào thẻ để chuyển bước (chỉ tiến lên): thả vào SU = đạt R1, thả vào LU = đã hẹn R2, thả vào OB = đạt R2. Kết quả R2 nhập trong hồ sơ.
-        </p>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1.5 text-xs leading-5 rounded border border-slate-200 bg-slate-50 text-slate-600">
+          <span>Bấm vào thẻ để chỉ xem ứng viên ở đó.</span>
+          <span>
+            Kéo ứng viên thả vào thẻ để chuyển bước (chỉ tiến lên): <strong>SU</strong> = đạt R1, <strong>LU</strong> = đã hẹn R2, <strong>OB</strong> = đạt R2.
+          </span>
+          <span>Kết quả R2 nhập trong hồ sơ.</span>
+        </div>
       )}
       {msg && (
-        <div className={`px-3 py-2 text-xs rounded border ${msg.type === 'ok' ? 'text-emerald-800 bg-emerald-50 border-emerald-200' : 'text-red-700 bg-red-50 border-red-200'}`}>{msg.text}</div>
+        <div className={`px-3 py-1.5 text-xs leading-5 rounded border ${msg.type === 'ok' ? 'text-emerald-800 bg-emerald-50 border-emerald-200' : 'text-red-700 bg-red-50 border-red-200'}`}>{msg.text}</div>
       )}
     </div>
   );
