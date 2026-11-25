@@ -2,7 +2,6 @@
 // lưu ô = Edge records-save (patch, kiểm row_version). Giao diện giữ nguyên.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshCw, Copy, Check, AlertTriangle, Search, Calendar, User, GitBranch, MapPin, Users, Ban } from 'lucide-react';
-import { FIELD_BY_KEY } from '../../../shared/fieldCatalog.ts';
 import { WD_STEP_GROUP_MATCH, WD_STEP_GROUP_OTHER, WD_STEPS_BY_PROCESS } from '../../../shared/wdRules.ts';
 import {
   candidateService as dataService,
@@ -624,9 +623,6 @@ export const FollowWdView: React.FC<Props> = ({ user, dropdowns }) => {
         ) : (
           List
         )}
-        <p className="text-[12px] text-slate-400">
-          {FIELD_BY_KEY.wd_process.label} và {FIELD_BY_KEY.wd_step.label}: Admin sửa danh sách trong mục Drop-list. {FIELD_BY_KEY.pending_at.label}: TA tự gõ tên.
-        </p>
       </div>
     </div>
   );
