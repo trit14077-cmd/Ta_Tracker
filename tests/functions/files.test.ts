@@ -81,3 +81,18 @@ it('Content-Disposition giữ tên tiếng Việt', () => {
   expect(h).toContain('filename="TA1_Nguyen Duc_CV.pdf"');
   expect(h).toContain("filename*=UTF-8''TA1_Nguy%E1%BB%85n%20%C4%90%E1%BB%A9c_CV.pdf");
 });
+
+describe('thư mục theo PIC (mỗi TA một thư mục, Intern dùng chung)', () => {
+  const rec = { candidate_code: 'TA1', full_name: 'B' };
+  it('TA: <mã PIC>/...; Intern: Intern/...; không PIC: như cũ', () => {
+    expect(drivePlacement({ ...rec, pic: 'TA4-V.Khanh' }, 'cv', 'a.pdf').path).toEqual(['TA4-V.Khanh', 'TA Tracker CV']);
+    expect(drivePlacement({ ...rec, pic: 'TA4-V.Khanh' }, 'health_check', 'a.pdf').path).toEqual(['TA4-V.Khanh', 'TA Tracker Hồ sơ', 'TA1_B']);
+    expect(drivePlacement({ ...rec, pic: 'Intern23-NM.Linh' }, 'cv', 'a.pdf').path).toEqual(['Intern', 'TA Tracker CV']);
+    expect(drivePlacement(rec, 'cv', 'a.pdf').path).toEqual(['TA Tracker CV']);
+  });
+  it('đổi PIC => chuyển thư mục giấy tờ', () => {
+    const files = [{ id: 1, kind: 'payslip', drive_file_id: 'd1', file_name: 'x.pdf' }];
+    const p = renamePlan({ ...rec, pic: 'TA4-V.Khanh' }, { ...rec, pic: 'Intern23-NM.Linh' }, files);
+    expect(p.folder?.[0]).toBe('Intern');
+  });
+});

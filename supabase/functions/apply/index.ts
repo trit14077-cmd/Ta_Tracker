@@ -9,7 +9,8 @@ import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 import {
   BODY_MAX_APPLY, BODY_MAX_JSON, BodyTooLarge, corsHeaders, readFormLimited, readJsonLimited, TOO_LARGE_MESSAGE,
 } from '../admin-users/logic.ts';
-import { driveConfigured, ensureFolder, trash, upload } from '../files/drive.ts';
+import { driveConfigured, ensurePath, trash, upload } from '../files/drive.ts';
+import { picRoot } from '../files/logic.ts';
 import { applyCvFileName, validateApply } from './logic.ts';
 
 const URL_ = Deno.env.get('SUPABASE_URL')!;
@@ -87,7 +88,7 @@ Deno.serve(async (req) => {
     let driveId = '';
     if (v.cv && bytes) {
       if (!driveConfigured()) return fail(503, 'BUSY', 'Hệ thống đang bận. Vui lòng thử lại sau vài giây.');
-      const folder = await ensureFolder('TA Tracker CV');
+      const folder = await ensurePath(picRoot(pic) ? [picRoot(pic)!, 'TA Tracker CV'] : ['TA Tracker CV']);
       const taLabel = link.pic_label || 'Admin';
       driveId = await upload(folder, applyCvFileName(taLabel, v.clean.position, v.clean.full_name, v.cv.ext),
         v.cv.mime, bytes.buffer as ArrayBuffer);

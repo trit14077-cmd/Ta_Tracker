@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
       if (!chk.ok) return fail({ status: 422, code: chk.code, message: chk.message });
 
       // hồ sơ: đọc bằng service rồi để RPC kiểm quyền lần cuối; ở đây chỉ cần tên để đặt thư mục/tên file + Rank
-      const { data: rec } = await db.from('recruitment_records').select('id, emp_id, candidate_code, full_name, rank').eq('id', recordId).maybeSingle();
+      const { data: rec } = await db.from('recruitment_records').select('id, emp_id, candidate_code, full_name, rank, pic').eq('id', recordId).maybeSingle();
       if (!rec) return fail({ status: 404, code: 'NOT_FOUND', message: 'Không tìm thấy hồ sơ ứng viên.' });
       // quyền trước khi đụng tới Drive (RPC file_list kiểm cùng luật, không ghi gì)
       const perm = await db.rpc('file_list', { p_actor: prof.id, p_record_id: recordId });
