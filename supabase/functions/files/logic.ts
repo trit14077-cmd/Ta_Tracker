@@ -60,6 +60,8 @@ export function checkFile(kind: string, name: string, size: number, head: Uint8A
 /** Thư mục giấy tờ của hệ cũ (docsRoot_) và thư mục CV (cvFolder_) – nằm trong thư mục gốc của hệ thống. */
 export const DOCS_ROOT = 'TA Tracker Hồ sơ';
 export const CV_ROOT = 'TA Tracker CV';
+/** Thư mục chung toàn hệ thống (không theo TA). */
+export const LOG_ROOT = 'TA Tracker Nhật ký';
 
 /** Thư mục chung cho mọi Intern. */
 export const INTERN_ROOT = 'Intern';

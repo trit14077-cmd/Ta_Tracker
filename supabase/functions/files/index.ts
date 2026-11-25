@@ -12,7 +12,7 @@ import {
   BODY_MAX_JSON, BODY_MAX_UPLOAD, BodyTooLarge, corsHeaders, readFormLimited, readJsonLimited, TOO_LARGE_MESSAGE,
 } from '../admin-users/logic.ts';
 import { attachmentKind, attachmentKindApplicable } from '../../../shared/attachmentRules.ts';
-import { ATTACH_KINDS, MAX_PER_KIND, attachmentKinds, checkFile, contentDisposition, drivePlacement } from './logic.ts';
+import { ATTACH_KINDS, MAX_PER_KIND, attachmentKinds, checkFile, contentDisposition, drivePlacement, picRoot, CV_ROOT, DOCS_ROOT, LOG_ROOT } from './logic.ts';
 import { DriveError, download, driveConfigured, ensurePath, trash, upload } from './drive.ts';
 
 const URL_ = Deno.env.get('SUPABASE_URL')!;
@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
   const jwt = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
   const { data: who } = await db.auth.getUser(jwt);
   if (!who?.user) return fail({ status: 401, code: 'UNAUTHORIZED', message: 'Phiên đăng nhập không hợp lệ.' });
-  const { data: prof } = await db.from('profiles').select('id, active').eq('id', who.user.id).maybeSingle();
+  const { data: prof } = await db.from('profiles').select('id, active, role').eq('id', who.user.id).maybeSingle();
   if (!prof || !prof.active) return fail({ status: 403, code: 'FORBIDDEN', message: 'Tài khoản đã bị khóa hoặc chưa được cấp quyền.' });
   if (!driveConfigured()) return fail({ status: 503, code: 'DRIVE_NOT_CONFIGURED', message: 'Chưa cấu hình Google Drive cho hệ thống.' });
 
@@ -61,6 +61,19 @@ Deno.serve(async (req) => {
         if (e instanceof BodyTooLarge) throw e;
         return fail({ status: 400, code: 'BAD_JSON', message: 'Nội dung không phải JSON.' });
       }
+    }
+    // Admin: tạo sẵn cây thư mục theo PIC (mỗi TA một thư mục, Intern dùng chung, Nhật ký chung) – không có file nào bị đụng tới.
+    if (body.op === 'ensure_folders') {
+      if (prof.role !== 'admin') return fail({ status: 403, code: 'FORBIDDEN', message: 'Chỉ Admin được tạo sẵn thư mục.' });
+      const { data: pics, error: pe } = await db.from('pics').select('code').eq('active', true);
+      if (pe) throw new Error(pe.message);
+      const roots = [...new Set((pics ?? []).map((p) => picRoot(p.code)).filter((r): r is string => !!r))];
+      for (const root of roots) {
+        await ensurePath([root, CV_ROOT]);
+        await ensurePath([root, DOCS_ROOT]);
+      }
+      await ensurePath([LOG_ROOT]);
+      return json(200, { folders: roots, shared: [LOG_ROOT] });
     }
     // CV ứng viên gửi qua form ứng tuyển online (hộp "Ứng tuyển online", M7-3)
     if (body.op === 'app_cv') {

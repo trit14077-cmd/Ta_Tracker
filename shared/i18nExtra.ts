@@ -527,6 +527,10 @@ export const EXTRA: Record<string, string> = {
   'Bạn chỉ được tạo tài khoản Intern (role PIC, mã PIC dạng Intern..).': 'You can only create Intern accounts (role PIC, PIC code like Intern..).',
   'Bạn chỉ được quản lý tài khoản Intern do chính bạn tạo.': 'You can only manage Intern accounts that you created.',
   'Bạn chỉ được khóa/mở khóa hoặc đổi tên tài khoản Intern.': 'You can only lock/unlock or rename Intern accounts.',
+  // ---- tạo sẵn thư mục Drive
+  'Không tạo được thư mục Drive.': 'Could not create the Drive folders.',
+  'Không tạo được thư mục Drive. Kiểm tra cấu hình Google Drive rồi thử lại.': 'Could not create the Drive folders. Check the Google Drive setup and try again.',
+  'Chỉ Admin được tạo sẵn thư mục.': 'Only Admin can pre-create folders.',
   // ---- report bits
   '× DC': '× DC',
 };
