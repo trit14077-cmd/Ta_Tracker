@@ -1,7 +1,7 @@
 // Chuyển từ OLD/src/components/AlertsBell.tsx (M6-3). Giữ giao diện; dữ liệu qua RPC alerts (0017).
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
-import { opsService as dataService, type AlertsData, type CandidateBrief } from '../services/opsService.ts';
+import { opsService as dataService, type AlertsData } from '../services/opsService.ts';
 import { fmtIso } from './TasksView.tsx';
 
 /**
@@ -28,13 +28,9 @@ export const AlertsBell: React.FC<{ onOpenCandidate: (id: number) => void; onGoT
   }, []);
 
   const c = data?.counts;
-  const total = c ? c.overdue + c.due_soon + c.passed_no_hr + c.missing_docs : 0;
-  const person = (p: CandidateBrief, extra?: string) => (
-    <button key={p.candidate_id} type="button" onClick={() => { setOpen(false); onOpenCandidate(p.candidate_id); }} className="block w-full text-left px-2 py-1 rounded hover:bg-slate-50" data-no-i18n>
-      <span className="font-medium text-slate-900">{p.candidate_code} · {p.full_name}</span>
-      {extra && <span className="block text-[11px] text-slate-500">{extra}</span>}
-    </button>
-  );
+  // Số trên chuông chỉ tính công việc quá hạn / sắp đến hạn; hồ sơ cần xử lý nằm ở tab Công việc (chỉ nhắc 1 dòng).
+  const total = c ? c.overdue + c.due_soon : 0;
+  const todo = c ? c.passed_no_hr + c.missing_docs : 0;
   const group = (title: string, n: number, cls: string, body: React.ReactNode) =>
     n > 0 ? (
       <div className="py-1.5 border-t border-slate-100 first:border-t-0">
@@ -54,7 +50,7 @@ export const AlertsBell: React.FC<{ onOpenCandidate: (id: number) => void; onGoT
       {open && (
         <div className="absolute right-0 mt-2 w-80 max-h-[70vh] overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg z-50 p-1.5 text-xs">
           {!data && <p className="p-3 text-slate-500">Đang tải...</p>}
-          {data && total === 0 && <p className="p-3 text-slate-500">Không có cảnh báo nào.</p>}
+          {data && total === 0 && todo === 0 && <p className="p-3 text-slate-500">Không có cảnh báo nào.</p>}
           {data && (
             <>
               {group('Quá hạn', c!.overdue, 'text-red-700', data.overdue.map((t) => (
@@ -69,8 +65,14 @@ export const AlertsBell: React.FC<{ onOpenCandidate: (id: number) => void; onGoT
                   <span className="block text-[11px] text-slate-500">Hạn {fmtIso(t.due)} {t.due_time}{t.candidate_code ? ` · ${t.candidate_code}` : ''}</span>
                 </button>
               )))}
-              {group('Đạt R2, chưa có thông tin nhân sự', c!.passed_no_hr, 'text-blue-700', data.passed_no_hr.map((p) => person(p)))}
-              {group('Offer còn thiếu giấy tờ', c!.missing_docs, 'text-amber-700', data.missing_docs.map((p) => person(p, `Thiếu: ${p.detail}`)))}
+              {todo > 0 && (
+                <button type="button" onClick={() => { setOpen(false); onGoTasks(); }} className="block w-full text-left px-2 py-2 border-t border-slate-100 first:border-t-0 hover:bg-slate-50" data-no-i18n>
+                  <span className="font-medium text-slate-900">{todo} hồ sơ cần xử lý</span>
+                  <span className="block text-[11px] text-slate-500">
+                    {c!.missing_docs} Offer thiếu giấy tờ, {c!.passed_no_hr} đạt R2 chưa có thông tin nhân sự. Xem ở tab Công việc.
+                  </span>
+                </button>
+              )}
               {total > 0 && (
                 <button type="button" onClick={() => { setOpen(false); onGoTasks(); }} className="block w-full text-center mt-1 py-1.5 text-blue-700 border-t border-slate-100 hover:bg-slate-50">
                   Mở trang Công việc

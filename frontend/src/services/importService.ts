@@ -126,6 +126,13 @@ export const importService = {
   async getImportRows(batchId: string, params: { filter?: string; sheet?: string; page?: number; pageSize?: number }): Promise<ImportRowsResponse> {
     return engine.rows(batchId, params);
   },
+  /** Bỏ dòng khỏi lô đang xem trước (chưa nhập gì vào hệ thống). */
+  async excludeImportRows(
+    batchId: string,
+    target: { items: { sheet: string; rowNumber: number }[] } | { filter: string; sheet?: string },
+  ): Promise<ImportPreviewResponse> {
+    return engine.exclude(batchId, target);
+  },
   async startImportCommit(batchId: string): Promise<void> {
     return engine.start(batchId);
   },

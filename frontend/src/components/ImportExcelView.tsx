@@ -121,6 +121,25 @@ export const ImportExcelView: React.FC<ImportExcelViewProps> = ({ onImportSucces
     (preview.sheets.filter((s) => s.selected).length !== selectedSheets.size ||
       preview.sheets.some((s) => s.selected !== selectedSheets.has(s.name)));
 
+  // Bỏ dòng khỏi lô trước khi nhập (chỉ trên trình duyệt, chưa ghi gì vào hệ thống).
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const rowKey = (r: { sheet: string; rowNumber: number }) => `${r.sheet}#${r.rowNumber}`;
+  useEffect(() => setPicked(new Set()), [rows]);
+  const handleExclude = async (target: Parameters<typeof dataService.excludeImportRows>[1], count: number) => {
+    if (!preview) return;
+    if (!window.confirm(`Bỏ ${count.toLocaleString('vi-VN')} dòng khỏi lô nhập?
+Các dòng này sẽ không được nhập. Dữ liệu trong file Excel gốc không bị đổi.`)) return;
+    setErrorMsg('');
+    try {
+      const res = await dataService.excludeImportRows(preview.batchId, target);
+      setPreview(res);
+      setPage(1);
+      await loadRows();
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Không thể bỏ các dòng đã chọn.');
+    }
+  };
+
   const handleApplySelection = async () => {
     if (!preview) return;
     setApplyingSelection(true);
@@ -462,6 +481,26 @@ export const ImportExcelView: React.FC<ImportExcelViewProps> = ({ onImportSucces
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
+              {picked.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleExclude({ items: rows.filter((r) => picked.has(rowKey(r))).map((r) => ({ sheet: r.sheet, rowNumber: r.rowNumber })) }, picked.size)
+                  }
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-red-600 rounded-md hover:bg-red-700 whitespace-nowrap"
+                >
+                  <span>Bỏ {picked.size} dòng đã chọn</span>
+                </button>
+              )}
+              {rowsTotal > 0 && (
+                <button
+                  type="button"
+                  onClick={() => handleExclude({ filter: filterMode, sheet: sheetFilter || undefined }, rowsTotal)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-red-800 bg-white border border-red-300 rounded-md hover:bg-red-50 whitespace-nowrap"
+                >
+                  <span>Bỏ tất cả {rowsTotal.toLocaleString('vi-VN')} dòng đang lọc</span>
+                </button>
+              )}
               {preview.invalidCount > 0 && (
                 <button
                   type="button"
@@ -493,6 +532,14 @@ export const ImportExcelView: React.FC<ImportExcelViewProps> = ({ onImportSucces
               <table className="w-full text-left border-collapse text-xs">
                 <thead className="sticky top-0 bg-slate-100 border-b border-slate-200 text-slate-700 font-semibold z-10">
                   <tr>
+                    <th className="py-2.5 px-3 w-8">
+                      <input
+                        type="checkbox"
+                        title="Chọn tất cả dòng ở trang này"
+                        checked={rows.length > 0 && rows.every((r) => picked.has(rowKey(r)))}
+                        onChange={(e) => setPicked(e.target.checked ? new Set(rows.map(rowKey)) : new Set())}
+                      />
+                    </th>
                     <th className="py-2.5 px-3 w-32">Sheet</th>
                     <th className="py-2.5 px-3 w-16">Dòng</th>
                     <th className="py-2.5 px-3 w-24">Trạng thái</th>
@@ -506,14 +553,14 @@ export const ImportExcelView: React.FC<ImportExcelViewProps> = ({ onImportSucces
                 <tbody className="divide-y divide-slate-200">
                   {loadingRows && (
                     <tr>
-                      <td colSpan={8} className="py-6 text-center text-slate-500">
+                      <td colSpan={9} className="py-6 text-center text-slate-500">
                         Đang tải...
                       </td>
                     </tr>
                   )}
                   {!loadingRows && rows.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="py-6 text-center text-slate-500">
+                      <td colSpan={9} className="py-6 text-center text-slate-500">
                         Không có dòng nào thuộc bộ lọc này.
                       </td>
                     </tr>
@@ -527,6 +574,20 @@ export const ImportExcelView: React.FC<ImportExcelViewProps> = ({ onImportSucces
                           key={`${r.sheet}-${r.rowNumber}`}
                           className={r.valid ? 'hover:bg-slate-50' : 'bg-red-50/30 hover:bg-red-50/50'}
                         >
+                          <td className="py-2 px-3">
+                            <input
+                              type="checkbox"
+                              checked={picked.has(rowKey(r))}
+                              onChange={(e) =>
+                                setPicked((prev) => {
+                                  const n = new Set(prev);
+                                  if (e.target.checked) n.add(rowKey(r));
+                                  else n.delete(rowKey(r));
+                                  return n;
+                                })
+                              }
+                            />
+                          </td>
                           <td className="py-2 px-3 text-slate-700">{r.sheet}</td>
                           <td className="py-2 px-3 font-mono-tabular font-semibold text-slate-700">#{r.rowNumber}</td>
                           <td className="py-2 px-3">

@@ -4,6 +4,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { opsService as dataService, type TaskItem } from '../services/opsService.ts';
 import type { UserProfile } from '../services/authService.ts';
 import { TASK_PRIORITIES, TASK_TYPES } from '../../../shared/opsRules.ts';
+import { CandidateTodoPanel } from './CandidateTodoPanel.tsx';
 
 export const fmtIso = (iso: string) => (iso ? iso.split('-').reverse().join('/') : '');
 const PRIO_CLS: Record<string, string> = { Cao: 'text-red-700 bg-red-50', 'Trung bình': 'text-amber-700 bg-amber-50', Thấp: 'text-slate-600 bg-slate-100' };
@@ -156,6 +157,7 @@ export const TasksView: React.FC<{ user: UserProfile; onOpenCandidate: (id: numb
 
   return (
     <div className="space-y-4">
+      <CandidateTodoPanel onOpenCandidate={onOpenCandidate} />
       <div className="bg-white border border-slate-200 rounded-lg p-4">
         <h3 className="text-sm font-bold text-slate-900 mb-2">Thêm công việc</h3>
         <TaskForm user={user} onSaved={load} />

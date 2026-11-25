@@ -51,6 +51,8 @@ interface Batch {
   progress: { done: number; total: number };
   result?: ImportStatusResponse['result'];
   errorMessage?: string;
+  /** Dòng người dùng đã bỏ khỏi lô (khóa `sheet#dòng`); dòng này không được nhập và không dùng để ghép trùng. */
+  excluded?: Set<string>;
 }
 
 export interface GasImportDeps {
@@ -160,6 +162,7 @@ export function createGasImport(deps: GasImportDeps) {
       const rep = b.sheets.find((s) => s.name === ps.name)!;
       if (!rep.selected) continue;
       for (const item of ps.rows) {
+        if (b.excluded?.has(`${ps.name}#${item.rowNumber}`)) continue;
         const row = evaluate(ps.name, item.rowNumber, { ...item.raw });
         const code = row.data.candidate_code;
         if (code) {
@@ -401,6 +404,33 @@ export function createGasImport(deps: GasImportDeps) {
     };
   }
 
+  /** Bỏ dòng khỏi lô nhập: theo danh sách dòng, hoặc theo bộ lọc đang xem. Tính lại trùng lặp và số liệu. */
+  async function exclude(
+    batchId: string,
+    target: { items: { sheet: string; rowNumber: number }[] } | { filter: string; sheet?: string }
+  ): Promise<ImportPreviewResponse> {
+    const b = need(batchId);
+    if (b.state !== 'ready') throw new Error('Lô này đã được nhập hoặc đang nhập.');
+    const set = (b.excluded ??= new Set<string>());
+    if ('items' in target) {
+      for (const it of target.items) set.add(`${it.sheet}#${it.rowNumber}`);
+    } else {
+      const { filter, sheet } = target;
+      for (const r of b.rows) {
+        if (sheet && r.sheet !== sheet) continue;
+        const hit =
+          filter === 'all' ||
+          (filter === 'valid' && r.status === 'valid') ||
+          (filter === 'invalid' && r.status === 'invalid') ||
+          (filter === 'duplicate' && r.status === 'duplicate') ||
+          (filter === 'warning' && r.status === 'valid' && Boolean(r.notices.pic));
+        if (hit) set.add(`${r.sheet}#${r.rowNumber}`);
+      }
+    }
+    applySelection(b, new Set(b.sheets.filter((x) => x.selected).map((x) => x.name)));
+    return summary(b);
+  }
+
   async function start(batchId: string): Promise<void> {
     const b = need(batchId);
     if (b.state !== 'ready') throw new Error('Lô này đã được nhập hoặc đang nhập. Hãy tải file lên lại nếu cần.');
@@ -467,5 +497,5 @@ export function createGasImport(deps: GasImportDeps) {
     await deps.downloadXlsx('TA_TRACKER_Loi_Nhap_Excel.xlsx', matrix, 'Loi_khi_nhap');
   }
 
-  return { preview, select, rows, start, status, downloadErrors };
+  return { preview, select, rows, exclude, start, status, downloadErrors };
 }
