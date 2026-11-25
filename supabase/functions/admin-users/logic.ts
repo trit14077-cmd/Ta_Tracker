@@ -88,6 +88,31 @@ export function finalRoleCheck(role: Role, pic: string | null): ApiError | null 
   return null;
 }
 
+/** PIC của Intern (VD "Intern23-NM.Linh"). TA quản lý nhóm chỉ được tạo/gán loại này. */
+export const INTERN_PIC_RE = /^Intern\d+-/;
+
+/**
+ * TA được ủy quyền (pic_delegations.can_create_interns) chỉ được: tạo tài khoản role pic mang PIC Intern;
+ * khóa/mở, đổi tên, đặt lại mật khẩu tài khoản do chính mình tạo (profiles.created_by). Không đổi role/PIC/target.
+ * `targetCreatedBy` chỉ cần cho update/reset_password.
+ */
+export function internManagerCheck(callerId: string, req: AdminRequest, targetCreatedBy?: string | null): ApiError | null {
+  const deny = (message: string): ApiError => ({ status: 403, code: 'FORBIDDEN', message });
+  if (req.op === 'create') {
+    if (req.role !== 'pic' || !req.pic_code || !INTERN_PIC_RE.test(req.pic_code)) {
+      return deny('Bạn chỉ được tạo tài khoản Intern (role PIC, mã PIC dạng Intern..).');
+    }
+    return null;
+  }
+  if (targetCreatedBy !== callerId) return deny('Bạn chỉ được quản lý tài khoản Intern do chính bạn tạo.');
+  if (req.op === 'update') {
+    if ('role' in req || 'pic_code' in req || 'can_view_all_targets' in req) {
+      return deny('Bạn chỉ được khóa/mở khóa hoặc đổi tên tài khoản Intern.');
+    }
+  }
+  return null;
+}
+
 /** Admin không được tự khóa / tự hạ quyền mình (tránh hệ thống mất Admin). */
 export function selfLockout(callerId: string, req: AdminRequest): ApiError | null {
   if (req.op !== 'update' || req.id !== callerId) return null;

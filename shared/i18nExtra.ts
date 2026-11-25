@@ -523,6 +523,10 @@ export const EXTRA: Record<string, string> = {
   'Đạt R1, hẹn / đến phỏng vấn R2': 'Passed R1, scheduled / showed up for R2',
   'Đang ở vòng 2': 'In round 2',
   'Không có ứng viên': 'No candidates',
+  // ---- Intern do TA quản lý nhóm tạo (admin-users)
+  'Bạn chỉ được tạo tài khoản Intern (role PIC, mã PIC dạng Intern..).': 'You can only create Intern accounts (role PIC, PIC code like Intern..).',
+  'Bạn chỉ được quản lý tài khoản Intern do chính bạn tạo.': 'You can only manage Intern accounts that you created.',
+  'Bạn chỉ được khóa/mở khóa hoặc đổi tên tài khoản Intern.': 'You can only lock/unlock or rename Intern accounts.',
   // ---- report bits
   '× DC': '× DC',
 };

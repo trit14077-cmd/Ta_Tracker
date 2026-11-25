@@ -1,10 +1,10 @@
-// Edge Function admin-users (M3-2, API_SPEC §4.5). Chỉ Admin đang hoạt động gọi được.
+// Edge Function admin-users (M3-2, API_SPEC §4.5). Admin đang hoạt động gọi được; TA quản lý nhóm chỉ trong phạm vi Intern (0032/0033).
 // POST {op:"create"|"update"|"reset_password", ...}. Dùng service role (secret có sẵn của Edge Function) để
 // quản lý auth.users + profiles; người gọi được xác thực bằng JWT của chính họ.
 // Biến môi trường: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (Supabase cấp sẵn), ALLOWED_ORIGINS (danh sách, phân cách dấu phẩy).
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 import {
-  auditChanges, BODY_MAX_JSON, BodyTooLarge, corsHeaders, finalRoleCheck, parseRequest, readJsonLimited, selfLockout,
+  auditChanges, BODY_MAX_JSON, BodyTooLarge, corsHeaders, finalRoleCheck, internManagerCheck, parseRequest, readJsonLimited, selfLockout,
   TOO_LARGE_MESSAGE, usernameToEmail, type ApiError,
 } from './logic.ts';
 
@@ -28,9 +28,19 @@ Deno.serve(async (req) => {
   const jwt = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
   const { data: who, error: whoErr } = await admin.auth.getUser(jwt);
   if (whoErr || !who?.user) return fail({ status: 401, code: 'UNAUTHORIZED', message: 'Phiên đăng nhập không hợp lệ.' });
-  const { data: caller } = await admin.from('profiles').select('id, username, role, active').eq('id', who.user.id).maybeSingle();
-  if (!caller || !caller.active || caller.role !== 'admin') {
+  const { data: caller } = await admin.from('profiles').select('id, username, role, active, pic_code').eq('id', who.user.id).maybeSingle();
+  if (!caller || !caller.active) {
     return fail({ status: 403, code: 'FORBIDDEN', message: 'Chỉ Admin được quản lý tài khoản.' });
+  }
+  // TA quản lý nhóm (pic_delegations.can_create_interns) được tạo/quản lý Intern do mình tạo; còn lại chỉ Admin.
+  let internManager = false;
+  if (caller.role !== 'admin') {
+    if (caller.role === 'pic' && caller.pic_code) {
+      const { data: dg } = await admin.from('pic_delegations').select('managed_pic')
+        .eq('manager_pic', caller.pic_code).eq('can_create_interns', true).limit(1);
+      internManager = !!dg && dg.length > 0;
+    }
+    if (!internManager) return fail({ status: 403, code: 'FORBIDDEN', message: 'Chỉ Admin được quản lý tài khoản.' });
   }
 
   // 2) kiểm tra yêu cầu
@@ -58,6 +68,10 @@ Deno.serve(async (req) => {
 
   // 3) thực hiện
   if (r.op === 'create') {
+    if (internManager) {
+      const denied = internManagerCheck(caller.id, r);
+      if (denied) return fail(denied);
+    }
     if (!(await picExists(r.pic_code))) return fail({ status: 422, code: 'VALIDATION_FAILED', message: 'PIC không có trong danh mục.', fields: { pic_code: 'PIC không có trong danh mục.' } });
     const { data: dup } = await admin.from('profiles').select('id').eq('username', r.username).maybeSingle();
     if (dup) return fail({ status: 409, code: 'USERNAME_TAKEN', message: 'Tên đăng nhập đã tồn tại.' });
@@ -70,7 +84,7 @@ Deno.serve(async (req) => {
     }
     const uid = created.data.user.id;
     const ins = await admin.from('profiles').insert({
-      id: uid, username: r.username, full_name: r.full_name, role: r.role, pic_code: r.pic_code,
+      id: uid, username: r.username, full_name: r.full_name, role: r.role, pic_code: r.pic_code, created_by: caller.id,
     });
     if (ins.error) {
       await admin.auth.admin.deleteUser(uid); // hoàn tác để không để lại user thiếu profile
@@ -80,8 +94,12 @@ Deno.serve(async (req) => {
     return json(201, { id: uid, username: r.username, role: r.role, pic_code: r.pic_code });
   }
 
-  const { data: target } = await admin.from('profiles').select('id, role, pic_code, active').eq('id', r.id).maybeSingle();
+  const { data: target } = await admin.from('profiles').select('id, role, pic_code, active, created_by').eq('id', r.id).maybeSingle();
   if (!target) return fail({ status: 404, code: 'NOT_FOUND', message: 'Không tìm thấy tài khoản.' });
+  if (internManager) {
+    const denied = internManagerCheck(caller.id, r, target.created_by);
+    if (denied) return fail(denied);
+  }
 
   if (r.op === 'update') {
     const role = r.role ?? target.role;

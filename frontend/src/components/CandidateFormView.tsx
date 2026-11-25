@@ -43,7 +43,7 @@ import {
   type FormInfo,
   ApiError,
 } from '../services/candidateService.ts';
-import type { UserProfile } from '../services/authService.ts';
+import { canEditPic, type UserProfile } from '../services/authService.ts';
 import { SearchableSelect } from './SearchableSelect.tsx';
 import { DatePickButton } from './DatePickButton.tsx';
 import { ConflictResolutionModal } from './ConflictResolutionModal.tsx';
@@ -155,7 +155,7 @@ export const CandidateFormView: React.FC<CandidateFormViewProps> = ({
   const canEdit = useMemo(() => {
     if (user.role === 'admin') return true;
     if (!isEditMode) return Boolean(user.pic_code);
-    return Boolean(user.pic_code && String(editingCandidate?.pic) === user.pic_code);
+    return canEditPic(user, editingCandidate?.pic);
   }, [user, isEditMode, editingCandidate]);
 
   // New candidate: preview the auto code for the chosen PIC (the server assigns the real one when saving).

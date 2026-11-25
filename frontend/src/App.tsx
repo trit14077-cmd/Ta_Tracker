@@ -8,7 +8,7 @@ import {
   ClipboardCheck, ChevronsLeft, ChevronsRight, ListTodo, CalendarDays, Target, Construction, Table2, SquareKanban, Search, Inbox,
 } from 'lucide-react';
 import logoUrl from './assets/the-supra-logo.png';
-import { authService, type UserProfile } from './services/authService.ts';
+import { authService, canEditPic, type UserProfile } from './services/authService.ts';
 import { configError } from './lib/supabase.ts';
 import { UserAdminView } from './components/UserAdminView.tsx';
 import { CandidateTableView } from './components/CandidateTableView.tsx';
@@ -346,7 +346,7 @@ export default function App() {
     { id: 'audit', label: 'Nhật ký', icon: History },
     { id: 'users', label: 'Tài khoản', icon: ShieldCheck, adminOnly: true },
   ];
-  const visibleNavItems = navItems.filter((item) => !item.adminOnly || user.role === 'admin');
+  const visibleNavItems = navItems.filter((item) => !item.adminOnly || user.role === 'admin' || (item.id === 'users' && Boolean(user.can_create_interns)));
 
   return (
     <div className="min-h-screen flex bg-[#F5F8FA] text-slate-900">
@@ -471,8 +471,8 @@ export default function App() {
         </header>
 
         <main className="flex-1 p-6 overflow-y-auto">
-          {activeTab === 'users' && user.role === 'admin' ? (
-            <UserAdminView currentUserId={user.id} />
+          {activeTab === 'users' && (user.role === 'admin' || user.can_create_interns) ? (
+            <UserAdminView currentUserId={user.id} limited={user.role !== 'admin'} />
           ) : activeTab === 'candidates' ? (
             <div className="space-y-3">
               <div className="flex items-center justify-end gap-2">
@@ -609,7 +609,7 @@ export default function App() {
         <CandidateDetailModal
           candidate={openDetail}
           user={user}
-          canEdit={user.role === 'admin' || (Boolean(user.pic_code) && String(openDetail.pic) === user.pic_code)}
+          canEdit={canEditPic(user, openDetail.pic)}
           busy={openBusy}
           error={openError}
           onClose={() => setOpenDetail(null)}
