@@ -21,6 +21,7 @@ import { TasksView } from './components/TasksView.tsx';
 import { CalendarView } from './components/CalendarView.tsx';
 import { TargetsView } from './components/TargetsView.tsx';
 import { AlertsBell } from './components/AlertsBell.tsx';
+import { TodoLoginPopup } from './components/TodoLoginPopup.tsx';
 import { AuditLogView } from './components/AuditLogView.tsx';
 import { AuditPurgeCard } from './components/AuditPurgeCard.tsx';
 import { DropdownAdminView } from './components/DropdownAdminView.tsx';
@@ -446,6 +447,7 @@ export default function App() {
             </div>
 
             <AlertsBell onOpenCandidate={openCandidateById} onGoTasks={() => setActiveTab('tasks')} />
+            <TodoLoginPopup userId={user.id} onGoTasks={() => setActiveTab('tasks')} />
 
             <LangSwitch />
 
