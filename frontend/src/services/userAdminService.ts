@@ -45,6 +45,13 @@ export const userAdminService = {
     return callAdminUsers({ op: 'update', id, ...changes });
   },
 
+  /** Admin: tạo sẵn thư mục Drive cho từng TA, Intern và Nhật ký (Edge files, op ensure_folders). */
+  async ensureDriveFolders(): Promise<string[]> {
+    const { data, error } = await supabase.functions.invoke('files', { body: { op: 'ensure_folders' } });
+    if (error) throw new Error('Không tạo được thư mục Drive. Kiểm tra cấu hình Google Drive rồi thử lại.');
+    return ((data as { folders?: string[] })?.folders ?? []);
+  },
+
   resetPassword(id: string, password: string) {
     return callAdminUsers({ op: 'reset_password', id, temp_password: password });
   },

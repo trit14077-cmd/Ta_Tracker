@@ -75,6 +75,16 @@ export const UserAdminView: React.FC<UserAdminViewProps> = ({ currentUserId, lim
     }
   };
 
+  const handleEnsureFolders = () =>
+    run(
+      async () => {
+        const f = await userAdminService.ensureDriveFolders();
+        setMsg({ type: 'success', text: `Đã tạo sẵn thư mục Drive: ${f.join(', ')} và "TA Tracker Nhật ký".` });
+      },
+      undefined,
+      'Không tạo được thư mục Drive.',
+    );
+
   const handleToggleActive = (u: UserProfile) =>
     run(() => userAdminService.updateUser(u.id, { active: !u.active }), undefined, 'Không thể cập nhật trạng thái tài khoản.');
 
@@ -101,6 +111,21 @@ export const UserAdminView: React.FC<UserAdminViewProps> = ({ currentUserId, lim
 
   return (
     <div className="space-y-5">
+      {!limited && (
+        <div className="bg-white border border-slate-200 rounded-lg p-4 flex items-center justify-between gap-3">
+          <p className="text-xs text-slate-600">
+            Thư mục Drive: mỗi TA một thư mục theo mã PIC, Intern dùng chung, cộng "TA Tracker Nhật ký". Bấm để tạo sẵn (không đụng tới file đã có).
+          </p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={handleEnsureFolders}
+            className="px-3 py-2 text-xs font-semibold bg-slate-800 text-white rounded-md disabled:opacity-50 whitespace-nowrap"
+          >
+            Tạo sẵn thư mục Drive
+          </button>
+        </div>
+      )}
       {/* Create Account Form */}
       <div className="bg-white border border-slate-200 rounded-lg p-5 space-y-4">
         <div>
