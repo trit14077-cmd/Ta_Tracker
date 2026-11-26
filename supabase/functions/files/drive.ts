@@ -107,6 +107,37 @@ export function googleConfigured(): boolean {
   return ['GOOGLE_OAUTH_CLIENT_ID', 'GOOGLE_OAUTH_CLIENT_SECRET', 'GOOGLE_OAUTH_REFRESH_TOKEN'].every((k) => env(k));
 }
 
+/** Ghi đè 1 tab của Google Sheet bằng `matrix` (RAW: không tính công thức). Tab chưa có thì tạo; kích thước lưới khớp dữ liệu. */
+export async function writeSheet(sheetId: string, tab: string, matrix: string[][]): Promise<void> {
+  const base = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}`;
+  const jsonHeaders = async () => ({ Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' });
+  const check = async (r: Response) => {
+    if (r.status === 403 || r.status === 404) throw new SheetAccessError(String(r.status));
+    if (!r.ok) throw new DriveError(`sheets ${r.status}`);
+    return r;
+  };
+  const meta = await check(await fetch(`${base}?fields=sheets.properties(sheetId,title)`, { headers: await jsonHeaders() }));
+  const props = ((await meta.json()) as { sheets?: { properties: { sheetId: number; title: string } }[] }).sheets ?? [];
+  const rows = Math.max(matrix.length, 1);
+  const cols = Math.max(matrix[0]?.length ?? 1, 1);
+  const grid = { rowCount: rows, columnCount: cols };
+  const found = props.find((s) => s.properties.title === tab);
+  const req = found
+    ? { updateSheetProperties: { properties: { sheetId: found.properties.sheetId, gridProperties: grid }, fields: 'gridProperties.rowCount,gridProperties.columnCount' } }
+    : { addSheet: { properties: { title: tab, gridProperties: grid } } };
+  await check(await fetch(`${base}:batchUpdate`, { method: 'POST', headers: await jsonHeaders(), body: JSON.stringify({ requests: [req] }) }));
+  const q = encodeURIComponent(`'${tab.replace(/'/g, "''")}'`);
+  await check(await fetch(`${base}/values/${q}:clear`, { method: 'POST', headers: await jsonHeaders(), body: '{}' }));
+  const CHUNK = 2000;
+  for (let i = 0; i < matrix.length; i += CHUNK) {
+    const part = matrix.slice(i, i + CHUNK);
+    const range = encodeURIComponent(`'${tab.replace(/'/g, "''")}'!A${i + 1}`);
+    await check(await fetch(`${base}/values/${range}?valueInputOption=RAW`, {
+      method: 'PUT', headers: await jsonHeaders(), body: JSON.stringify({ values: part }),
+    }));
+  }
+}
+
 /** Đọc 1 tab của Google Sheet (giá trị như hiển thị). 403/404 => SheetAccessError (sheet chưa chia sẻ cho tài khoản Google của hệ thống). */
 export class SheetAccessError extends Error {}
 export async function readSheet(sheetId: string, tab: string): Promise<unknown[][]> {

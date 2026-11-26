@@ -7,6 +7,12 @@ import { POSITION_EN } from '../../shared/positionCatalog.ts';
 
 export const NEW_EN: Record<string, string> = {
   'Chọn ngày trên lịch': 'Pick a date on the calendar',
+  // ---- sao lưu Supabase -> Google Sheet (Edge sheet-backup)
+  'Không có quyền sao lưu.': 'You do not have permission to run the backup.',
+  'Chưa cấu hình tài khoản Google hoặc GOOGLE_BACKUP_SHEET_ID.': 'The Google account or GOOGLE_BACKUP_SHEET_ID is not configured.',
+  'Không mở được sheet sao lưu. Hãy chia sẻ sheet (quyền chỉnh sửa) cho tài khoản Google của hệ thống.': 'Could not open the backup sheet. Share the sheet (edit access) with the system Google account.',
+  'Google từ chối yêu cầu. Kiểm tra quyền Sheets của token OAuth.': 'Google rejected the request. Check the Sheets permission of the OAuth token.',
+  'Lỗi không xác định.': 'Unknown error.',
   // ---- kiểm trùng SĐT / email (CandidateFormView)
   'Không kiểm tra được trùng số điện thoại — vui lòng kiểm tra thủ công trước khi lưu.': 'Could not check for a duplicate phone number — please check manually before saving.',
   'Không kiểm tra được trùng email — vui lòng kiểm tra thủ công trước khi lưu.': 'Could not check for a duplicate email — please check manually before saving.',

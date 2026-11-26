@@ -1,0 +1,31 @@
+# Sao lưu một chiều Supabase -> Google Sheet mỗi đêm (Edge Function sheet-backup). Supabase vẫn là nguồn chính.
+# Secrets (GitHub > Settings > Secrets and variables > Actions):
+#   SUPABASE_FUNCTIONS_URL   dạng https://<project-ref>.supabase.co/functions/v1
+#   SUPABASE_ANON_KEY        publishable/anon key (cổng gọi Edge Function)
+#   BACKUP_SYNC_TOKEN        chuỗi bí mật dài, đặt GIỐNG hệt secret Supabase BACKUP_SYNC_TOKEN
+# Không in phản hồi ra log: chỉ in mã HTTP và số dòng.
+name: sheet-backup
+on:
+  schedule:
+    - cron: "47 19 * * *"   # 19:47 UTC = 02:47 giờ VN, sau backup pg_dump
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Gọi sheet-backup
+        env:
+          FN_URL: ${{ secrets.SUPABASE_FUNCTIONS_URL }}
+          ANON: ${{ secrets.SUPABASE_ANON_KEY }}
+          TOKEN: ${{ secrets.BACKUP_SYNC_TOKEN }}
+        run: |
+          if [ -z "$FN_URL" ] || [ -z "$ANON" ] || [ -z "$TOKEN" ]; then echo "Thiếu secret, bỏ qua."; exit 0; fi
+          code=$(curl -sS -o out.json -w '%{http_code}' -X POST "$FN_URL/sheet-backup" \
+            -H "Authorization: Bearer $ANON" -H "apikey: $ANON" -H "x-backup-token: $TOKEN" \
+            -H 'Content-Type: application/json' -d '{}')
+          echo "HTTP $code"
+          if [ "$code" != "200" ]; then python3 -c "import json;e=json.load(open('out.json')).get('error',{});print(e.get('code'),e.get('message'))"; exit 1; fi
+          python3 -c "import json;d=json.load(open('out.json'));print('records',d.get('records'),'hr_info',d.get('hr_info'))"
