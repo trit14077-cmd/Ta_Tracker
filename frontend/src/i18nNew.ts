@@ -7,6 +7,32 @@ import { POSITION_EN } from '../../shared/positionCatalog.ts';
 
 export const NEW_EN: Record<string, string> = {
   'Chọn ngày trên lịch': 'Pick a date on the calendar',
+  // ---- kiểm trùng SĐT / email (CandidateFormView)
+  'Không kiểm tra được trùng số điện thoại — vui lòng kiểm tra thủ công trước khi lưu.': 'Could not check for a duplicate phone number — please check manually before saving.',
+  'Không kiểm tra được trùng email — vui lòng kiểm tra thủ công trước khi lưu.': 'Could not check for a duplicate email — please check manually before saving.',
+  // ---- Công việc / Hồ sơ cần xử lý (CandidateTodoPanel, TodoLoginPopup)
+  'Cần bổ sung giấy tờ bắt buộc': 'Required documents missing',
+  'Gửi form và nhập thông tin nhân sự': 'Send the form and enter HR information',
+  'Hồ sơ cần xử lý': 'Profiles to handle',
+  'Bấm vào một dòng để mở hồ sơ ứng viên.': 'Click a row to open the candidate profile.',
+  'Tìm mã hoặc tên ứng viên...': 'Search by candidate code or name...',
+  'Mã': 'Code',
+  'Giấy tờ còn thiếu': 'Missing documents',
+  'Việc cần làm': 'To do',
+  'Nhập thông tin nhân sự': 'Enter HR information',
+  'Không có hồ sơ nào khớp.': 'No matching profiles.',
+  'Không có hồ sơ nào cần xử lý.': 'No profiles to handle.',
+  'Công việc quá hạn': 'Overdue tasks',
+  'Công việc sắp đến hạn': 'Tasks due soon',
+  'Việc cần xử lý': 'Items to handle',
+  // ---- Import Excel (ImportExcelView)
+  'Không thể bỏ các dòng đã chọn.': 'Could not remove the selected rows.',
+  'Chọn tất cả dòng ở trang này': 'Select all rows on this page',
+  // ---- thẻ KPI (PipelineKpiStrip)
+  'Bấm vào thẻ để chỉ xem ứng viên ở đó.': 'Click a card to see only the candidates in it.',
+  '= đạt R1,': '= passed R1,',
+  '= đã hẹn R2,': '= R2 scheduled,',
+  'Kết quả R2 nhập trong hồ sơ.': 'The R2 result is entered in the profile.',
   // ---- lưu trữ nhật ký 12 tháng (AuditPurgeCard, Edge audit-purge, 0026)
   'Không tải được.': 'Could not load.',
   'Không dọn được nhật ký.': 'Could not archive the log.',
