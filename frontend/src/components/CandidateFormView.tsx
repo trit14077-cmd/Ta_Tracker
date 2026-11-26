@@ -140,6 +140,11 @@ export const CandidateFormView: React.FC<CandidateFormViewProps> = ({
   const [phoneDuplicates, setPhoneDuplicates] = useState<
     { candidate_code: string; full_name: string; pic: string; position?: string }[]
   >([]);
+  const [phoneCheckFailed, setPhoneCheckFailed] = useState<boolean>(false);
+  const [emailDuplicates, setEmailDuplicates] = useState<
+    { candidate_code: string; full_name: string; pic: string; position?: string }[]
+  >([]);
+  const [emailCheckFailed, setEmailCheckFailed] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [bannerMessage, setBannerMessage] = useState<{
     type: 'success' | 'error';
@@ -309,6 +314,7 @@ export const CandidateFormView: React.FC<CandidateFormViewProps> = ({
 
     if (norm.error) {
       setFieldErrors((prev) => ({ ...prev, phone: norm.error! }));
+      setPhoneCheckFailed(false);
       return;
     }
 
@@ -318,8 +324,26 @@ export const CandidateFormView: React.FC<CandidateFormViewProps> = ({
         editingCandidate?.id
       );
       setPhoneDuplicates(checkRes.duplicates || []);
+      setPhoneCheckFailed(!!checkRes.checkFailed);
     } catch {
-      // ignore network error on duplicate check
+      setPhoneCheckFailed(true);
+    }
+  };
+
+  // Email blur handler: kiểm tra trùng (không chặn lưu)
+  const handleEmailBlur = async () => {
+    const email = (values.email || '').trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailDuplicates([]);
+      setEmailCheckFailed(false);
+      return;
+    }
+    try {
+      const res = await candidateService.checkEmailDuplicate(email, editingCandidate?.id);
+      setEmailDuplicates(res.duplicates || []);
+      setEmailCheckFailed(res.checkFailed);
+    } catch {
+      setEmailCheckFailed(true);
     }
   };
 
@@ -731,6 +755,13 @@ export const CandidateFormView: React.FC<CandidateFormViewProps> = ({
         </div>
       )}
 
+      {phoneCheckFailed && (
+        <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2.5 text-xs text-amber-900">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <p className="font-semibold">Không kiểm tra được trùng số điện thoại — vui lòng kiểm tra thủ công trước khi lưu.</p>
+        </div>
+      )}
+
       {/* Duplicate phone non-blocking warning */}
       {phoneDuplicates.length > 0 && (
         <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2.5 text-xs text-amber-900">
@@ -742,6 +773,32 @@ export const CandidateFormView: React.FC<CandidateFormViewProps> = ({
             <ul className="mt-1 space-y-0.5 list-disc list-inside text-amber-800">
               {phoneDuplicates.map((d) => (
                 <li key={d.candidate_code}>
+                  Mã UV: <span className="font-mono-tabular font-semibold">{d.candidate_code}</span> —{' '}
+                  {d.full_name} (PIC: {d.pic})
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {emailCheckFailed && (
+        <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2.5 text-xs text-amber-900">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <p className="font-semibold">Không kiểm tra được trùng email — vui lòng kiểm tra thủ công trước khi lưu.</p>
+        </div>
+      )}
+
+      {emailDuplicates.length > 0 && (
+        <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2.5 text-xs text-amber-900">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold">
+              Cảnh báo trùng email ({values.email}) — Hệ thống vẫn cho phép lưu nhưng vui lòng kiểm tra:
+            </p>
+            <ul className="mt-1 space-y-0.5 list-disc list-inside text-amber-800">
+              {emailDuplicates.map((d, i) => (
+                <li key={`${d.candidate_code}-${i}`}>
                   Mã UV: <span className="font-mono-tabular font-semibold">{d.candidate_code}</span> —{' '}
                   {d.full_name} (PIC: {d.pic})
                 </li>
@@ -1148,7 +1205,7 @@ export const CandidateFormView: React.FC<CandidateFormViewProps> = ({
                           value={displayValue}
                           disabled={disabled}
                           onChange={(e) => updateField(field.key, e.target.value)}
-                          onBlur={field.key === 'phone' ? handlePhoneBlur : undefined}
+                          onBlur={field.key === 'phone' ? handlePhoneBlur : field.key === 'email' ? handleEmailBlur : undefined}
                           placeholder={
                             field.key === 'birth'
                               ? 'DD/MM/YYYY hoặc YYYY (VD: 15/08/1999 hoặc 1999)'

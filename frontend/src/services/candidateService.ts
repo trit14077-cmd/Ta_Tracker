@@ -448,13 +448,19 @@ export const candidateService = {
   },
 
   async checkPhoneDuplicate(phone: string, excludeCandidateCodeOrId?: string | number): Promise<{
-    normalized: string; wasNormalized: boolean; notice?: string; duplicates: DupRow[];
+    normalized: string; wasNormalized: boolean; notice?: string; duplicates: DupRow[]; checkFailed?: boolean;
   }> {
     const norm = normalizeAndValidatePhone(phone);
     const excludeId = typeof excludeCandidateCodeOrId === 'number' ? excludeCandidateCodeOrId : null;
     const { data, error } = await supabase.rpc('check_phone', { p_phone: norm.normalized || phone, p_exclude_id: excludeId });
     const dups = !error && data ? ((data as { duplicates?: DupRow[] }).duplicates || []) : [];
-    return { normalized: norm.normalized, wasNormalized: norm.wasNormalized, notice: norm.notice, duplicates: dups };
+    return { normalized: norm.normalized, wasNormalized: norm.wasNormalized, notice: norm.notice, duplicates: dups, checkFailed: !!error };
+  },
+
+  async checkEmailDuplicate(email: string, excludeId?: number | null): Promise<{ duplicates: DupRow[]; checkFailed: boolean }> {
+    const { data, error } = await supabase.rpc('check_email', { p_email: email.trim(), p_exclude_id: excludeId ?? null });
+    const dups = !error && data ? ((data as { duplicates?: DupRow[] }).duplicates || []) : [];
+    return { duplicates: dups, checkFailed: !!error };
   },
 
   // ===== thẻ KPI: đếm ở server (RPC board_counts), không tải dòng về trình duyệt =====
