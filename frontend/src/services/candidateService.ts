@@ -463,6 +463,13 @@ export const candidateService = {
     return { duplicates: dups, checkFailed: !!error };
   },
 
+  /** Task #14: hồ sơ khác cùng Mã nhân viên (Emp_ID). Chỉ cảnh báo, không chặn lưu. */
+  async checkEmpIdDuplicate(empId: string, excludeId?: number | null): Promise<{ duplicates: DupRow[]; checkFailed: boolean }> {
+    const { data, error } = await supabase.rpc('check_emp_id', { p_emp_id: empId.trim(), p_exclude_id: excludeId ?? null });
+    const dups = !error && data ? ((data as { duplicates?: DupRow[] }).duplicates || []) : [];
+    return { duplicates: dups, checkFailed: !!error };
+  },
+
   // ===== thẻ KPI: đếm ở server (RPC board_counts), không tải dòng về trình duyệt =====
   /** Số thẻ + 30 thẻ đầu mỗi ô. pic chỉ có tác dụng với Admin (server bỏ qua với TA, như hệ cũ). */
   async getBoard(pic: string, q: string, extra: BoardFilters = {}): Promise<BoardData> {
