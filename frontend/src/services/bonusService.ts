@@ -11,6 +11,31 @@ import {
   referralMomSheet,
   referralSummarySheet,
 } from '../../../shared/bonus/referralTemplate.ts';
+import {
+  cleanSignonFlag,
+  cleanSignonScheme,
+  signonMom,
+  type SignonFlag,
+  type SignonPaidMap,
+  type SignonRow,
+  type SignonScheme,
+  type SignonSource,
+} from '../../../shared/bonus/signon.ts';
+import {
+  SIGNON_PERIOD_WIDTHS,
+  signonDetailsSheet,
+  signonDetailsWidths,
+  signonPeriodSheet,
+  signonPeriodSheetName,
+  signonSummarySheet,
+} from '../../../shared/bonus/signonTemplate.ts';
+
+/** Sửa tay một hồ sơ Sign-on: scheme ('' = tự gán), cờ từng mốc, ghi chú. */
+export interface SignonPatch {
+  scheme_code?: string;
+  flags?: Record<string, SignonFlag>;
+  note?: string;
+}
 
 export interface BonusPeriod {
   id: number;
@@ -168,6 +193,88 @@ export const bonusService = {
       { name: referralListSheetName(period), rows: referralListSheet(rows), widths: REFERRAL_LIST_WIDTHS },
       { name: 'Summary', rows: referralSummarySheet(lines, period), widths: [2, 5, 12, 26, 16, 16, 2, 5, 12, 26, 16, 16, 2, 40, 14] },
       { name: 'MoM', rows: referralMomSheet(mom), widths: [10, 8, 12, 10, 14, 24] },
+    ]);
+  },
+
+  // ---------------- Sign-on (task #9) ----------------
+  async signonSchemes(): Promise<SignonScheme[]> {
+    const { data, error } = await supabase.from('bonus_signon_schemes').select('*').order('effective_from');
+    if (error) throw bonusError(error, 'Không tải được danh sách scheme Sign-on.');
+    const out: SignonScheme[] = [];
+    for (const r of (data ?? []) as Record<string, unknown>[]) {
+      const { scheme } = cleanSignonScheme(r);
+      if (scheme) out.push(scheme);
+    }
+    return out;
+  },
+
+  async saveSignonScheme(s: SignonScheme): Promise<void> {
+    const { error } = await supabase.rpc('bonus_signon_scheme_save', { p: { ...s, effective_to: s.effective_to ?? '' } });
+    if (error) throw bonusError(error, 'Không lưu được scheme Sign-on.');
+  },
+
+  /** Hồ sơ đã Joined tại các site có scheme, OBD từ `fromDate`, kèm scheme / cờ admin sửa tay. Lọc Rank 6 ở shared/bonus. */
+  async signonSources(fromDate: string, sites: string[]): Promise<SignonSource[]> {
+    if (!sites.length) return [];
+    const { data, error } = await supabase.from('recruitment_records')
+      .select('id, candidate_code, full_name, emp_id, rank, site, ob_date, emp_status, attrition_date, pic')
+      .eq('ob_status', 'Joined').eq('is_archived', false).in('site', sites).gte('ob_date', fromDate)
+      .order('ob_date').limit(5000);
+    if (error) throw bonusError(error, 'Không tải được danh sách Sign-on.');
+    const recs = (data ?? []) as Record<string, unknown>[];
+    const ids = recs.map((r) => Number(r.id));
+    const extra = new Map<number, Record<string, unknown>>();
+    for (let i = 0; i < ids.length; i += 500) {
+      const { data: d2, error: e2 } = await supabase.from('bonus_signon_records').select('*').in('record_id', ids.slice(i, i + 500));
+      if (e2) throw bonusError(e2, 'Không tải được cờ Sign-on.');
+      for (const b of (d2 ?? []) as Record<string, unknown>[]) extra.set(Number(b.record_id), b);
+    }
+    const s = (v: unknown) => (v == null ? '' : String(v));
+    return recs.map((r) => {
+      const b = extra.get(Number(r.id)) ?? {};
+      const flags: Record<string, SignonFlag> = {};
+      for (let k = 1; k <= 6; k++) {
+        const f = cleanSignonFlag(b[`m${k}_flag`]);
+        if (f) flags[`m${k}`] = f;
+      }
+      return {
+        record_id: Number(r.id), candidate_code: s(r.candidate_code), full_name: s(r.full_name), emp_id: s(r.emp_id), rank: s(r.rank),
+        dc: s(r.site), ob_date: (r.ob_date as string) ?? null, emp_status: s(r.emp_status),
+        attrition_date: (r.attrition_date as string) ?? null, pic: (r.pic as string) ?? null,
+        scheme_code: s(b.scheme_code), flags, note: s(b.note),
+      };
+    });
+  },
+
+  async saveSignon(recordId: number, patch: SignonPatch): Promise<void> {
+    const p: Record<string, string> = {};
+    if (patch.scheme_code !== undefined) p.scheme_code = patch.scheme_code;
+    if (patch.note !== undefined) p.note = patch.note;
+    for (const [k, v] of Object.entries(patch.flags ?? {})) p[`${k}_flag`] = v;
+    const { error } = await supabase.rpc('bonus_signon_save', { p_record_id: recordId, p });
+    if (error) throw bonusError(error, 'Không lưu được thông tin Sign-on.');
+  },
+
+  /** Mốc đã chốt của từng hồ sơ: record_id → { m1: { period, amount } … }. `lines` = khoản của các kỳ Sign-on. */
+  signonPaid(periods: BonusPeriod[], lines: BonusLine[]): SignonPaidMap {
+    const key = new Map(periods.map((p) => [p.id, p.period_key]));
+    const m: SignonPaidMap = new Map();
+    for (const l of lines) {
+      const k = key.get(l.period_id);
+      if (l.record_id == null || !k || !/^m\d$/.test(l.part)) continue;
+      m.set(l.record_id, { ...(m.get(l.record_id) ?? {}), [l.part]: { period: k, amount: l.amount } });
+    }
+    return m;
+  },
+
+  async exportSignon(period: string, rows: SignonRow[], all: SignonRow[], periods: BonusPeriod[], allLines: BonusLine[]): Promise<void> {
+    const locked = periods.filter((p) => p.status === 'da_chot').sort((a, b) => a.period_key.localeCompare(b.period_key));
+    const keys = [...new Set([...locked.map((p) => p.period_key).filter((k) => k <= period), period])].sort();
+    const mom = signonMom(locked.map((p) => ({ period: p.period_key, lines: allLines.filter((l) => l.period_id === p.id) })));
+    await downloadXlsxBook(`Sign-on_Bonus_Payment_${periodShort(period).replace("'", '')}_${stamp()}.xlsx`, [
+      { name: 'Sign-on Details', rows: signonDetailsSheet(all, keys), widths: signonDetailsWidths(all, keys) },
+      { name: signonPeriodSheetName(period), rows: signonPeriodSheet(rows, period), widths: SIGNON_PERIOD_WIDTHS },
+      { name: 'summary', rows: signonSummarySheet(mom), widths: [10, 16, 14, 16] },
     ]);
   },
 };
