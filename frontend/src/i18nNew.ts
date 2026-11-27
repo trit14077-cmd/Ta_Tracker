@@ -663,6 +663,22 @@ export const NEW_EN: Record<string, string> = {
   'PIC chưa có hồ sơ bonus': 'PIC has no bonus profile',
   'Hồ sơ bonus đang tắt': 'Bonus profile is off',
   'Thiếu Region / Level': 'Missing Region / Level',
+  // ---- Bonus Onsite (BonusOnsitePanel, bonusService, shared/bonus/onsite.ts, 0048)
+  'Còn thay đổi chưa lưu. Bấm Lưu trước khi chốt.': 'There are unsaved changes. Press Save before closing the period.',
+  'Còn thay đổi chưa lưu. Bỏ các thay đổi này?': 'There are unsaved changes. Discard them?',
+  'TA được trả': 'TAs paid',
+  'Tổng ngày onsite': 'Total onsite days',
+  'Đơn giá / ngày': 'Rate / day',
+  'Tổng Onsite': 'Onsite total',
+  'Tick ngày TA đi onsite trong tháng của kỳ lương rồi bấm Lưu. Cột = TA có hồ sơ bonus bật cờ Onsite (tab Cấu hình). Kỳ đã chốt thì không sửa được ngày.':
+    'Tick the days each TA was onsite in the pay period\'s month, then press Save. Columns = TAs whose bonus profile has Onsite on (Settings tab). Days cannot be changed once the period is closed.',
+  'Kỳ đã chốt không có khoản Onsite.': 'The closed period has no Onsite items.',
+  'Chưa có TA nào bật Onsite. Bật cờ Onsite trong hồ sơ bonus TA ở tab Cấu hình.': 'No TA has Onsite on yet. Turn on Onsite in the TA bonus profiles in the Settings tab.',
+  'Thứ': 'Weekday',
+  'Tiền': 'Amount',
+  'Phụ cấp Onsite': 'Onsite allowance',
+  'Đơn giá một ngày onsite (đ)': 'Rate per onsite day (VND)',
+  'Không lưu được ngày onsite.': 'Could not save the onsite days.',
 };
 
 // Danh từ trong các câu ghép "Không tải được …" / "Không tìm thấy … hoặc …" / "… chưa có trong hệ thống mới"
@@ -691,6 +707,11 @@ const PATTERNS: [RegExp, (...m: string[]) => string][] = [
   [/^Có (\d+) PIC có OB nhưng chưa có hồ sơ bonus hợp lệ \(không được trả\)\. Vẫn chốt\?$/, (_, n) => `${n} PICs have OBs but no valid bonus profile (not paid). Close anyway?`],
   [/^Chốt (.+): (\d+) TA, tổng (.+) đ\?$/, (_, p, n, t) => `Close ${p}: ${n} TAs, total ${t} VND?`],
   [/^Hiện tại: tối thiểu (\d+) ngày · đơn giá (.+) đ · Intern Base (.+) đ$/, (_, d, r, i) => `Current: minimum ${d} days · rates ${r} VND · Intern Base ${i} VND`],
+  [/^Đã lưu ngày onsite của (\d+) TA\.$/, (_, n) => `Saved the onsite days of ${n} TAs.`],
+  [/^Lưu \((\d+) TA\)$/, (_, n) => `Save (${n} TAs)`],
+  [/^Có (\d+) PIC có ngày onsite nhưng chưa có hồ sơ bonus hợp lệ \(không được trả\)\. Vẫn chốt\?$/, (_, n) => `${n} PICs have onsite days but no valid bonus profile (not paid). Close anyway?`],
+  [/^Chốt (.+): (\d+) TA, (\d+) ngày, tổng (.+) đ\?$/, (_, p, n, d, t) => `Close ${p}: ${n} TAs, ${d} days, total ${t} VND?`],
+  [/^Hiện tại: (.+) đ \/ ngày$/, (_, r) => `Current: ${r} VND / day`],
   [/^Tự gán: (.+)$/, (_, s) => `Auto: ${s}`],
   [/^Theo gợi ý: (.+)$/, (_, s) => `Suggested: ${s}`],
   [/^Mốc (\d+) \(\+(\d+) ngày\) · (.*)$/, (_, i, d, t) => `Milestone ${i} (+${d} days) · ${t}`],

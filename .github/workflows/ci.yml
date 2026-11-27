@@ -177,6 +177,10 @@ jobs:
         run: |
           psql -v ON_ERROR_STOP=1 -f supabase/tests/bonus_ta_credit_test.sql 2>&1 | tee bonus_ta_credit.log
           grep -q "BONUS_TA_CREDIT_TEST_PASSED" bonus_ta_credit.log
+      - name: Bonus Onsite (0048) – ngày onsite × TA, khóa khi kỳ đã chốt, TA xem ngày của mình (tự rollback)
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/bonus_onsite_test.sql 2>&1 | tee bonus_onsite.log
+          grep -q "BONUS_ONSITE_TEST_PASSED" bonus_onsite.log
       - name: 20 phiên đồng thời tạo mã cùng PIC không trùng
         run: bash supabase/tests/concurrency_codes.sh
 

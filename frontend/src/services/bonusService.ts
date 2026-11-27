@@ -41,6 +41,8 @@ import {
   type TaRegion,
 } from '../../../shared/bonus/taCredit.ts';
 import { OB_LIST_WIDTHS, TA_BONUS_WIDTHS, obListSheet, obListSheetName, taBonusSheet, taBonusSheetName } from '../../../shared/bonus/taCreditTemplate.ts';
+import { cleanOnsiteConfig, type OnsiteConfig, type OnsiteDay, type OnsiteRow } from '../../../shared/bonus/onsite.ts';
+import { ONSITE_SHEET_NAME, onsiteSheet, onsiteSheetWidths } from '../../../shared/bonus/onsiteTemplate.ts';
 
 /** Một PIC kèm hồ sơ bonus (has_profile = đã có dòng ta_bonus_profiles). */
 export interface TaProfileRow extends TaProfile {
@@ -348,6 +350,33 @@ export const bonusService = {
     await downloadXlsxBook(`TA_Credit_Bonus_${periodShort(period).replace("'", '')}_${stamp()}.xlsx`, [
       { name: taBonusSheetName(period), rows: taBonusSheet(rows, period), widths: TA_BONUS_WIDTHS },
       { name: obListSheetName(perfMonth), rows: obListSheet(obs), widths: OB_LIST_WIDTHS },
+    ]);
+  },
+
+  // ---------------- Onsite (task #10 phần 3) ----------------
+  async onsiteConfig(): Promise<OnsiteConfig> {
+    return cleanOnsiteConfig(await bonusService.settings('onsite'));
+  },
+
+  /** Ngày onsite trong tháng `month` ('YYYY-MM'). */
+  async onsiteDays(month: string): Promise<OnsiteDay[]> {
+    const { from, to } = periodMonthRange(month);
+    const { data, error } = await supabase.from('bonus_onsite_days').select('pic_code, day')
+      .gte('day', from).lte('day', to).order('day').limit(5000);
+    if (error) throw bonusError(error, 'Không tải được ngày onsite.');
+    return ((data ?? []) as { pic_code: string; day: string }[]).map((r) => ({ pic: r.pic_code, day: r.day }));
+  },
+
+  /** Thay toàn bộ ngày onsite của một TA trong tháng. */
+  async saveOnsiteDays(pic: string, month: string, days: string[]): Promise<void> {
+    const { error } = await supabase.rpc('bonus_onsite_set', { p_pic: pic, p_month: month, p_days: days });
+    if (error) throw bonusError(error, 'Không lưu được ngày onsite.');
+  },
+
+  async exportOnsite(period: string, rows: OnsiteRow[], rate: number): Promise<void> {
+    const n = rows.filter((r) => r.count > 0 && !r.problem).length;
+    await downloadXlsxBook(`TA_Onsite_Allowance_${periodShort(period).replace("'", '')}_${stamp()}.xlsx`, [
+      { name: ONSITE_SHEET_NAME, rows: onsiteSheet(rows, period, rate), widths: onsiteSheetWidths(n) },
     ]);
   },
 };

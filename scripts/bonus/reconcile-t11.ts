@@ -12,6 +12,7 @@ import {
 import {
   TA_CREDIT_DEFAULT_CONFIG, TA_LEVELS, buildTaCreditPeriod, obCredits, type TaCreditSource, type TaProfile,
 } from '../../shared/bonus/taCredit.ts';
+import { ONSITE_DEFAULT_CONFIG, buildOnsitePeriod, type OnsiteDay } from '../../shared/bonus/onsite.ts';
 import { REFERRAL_DEFAULT_RATES, buildReferralPeriod, type ReferralSource, type YesNo } from '../../shared/bonus/referral.ts';
 
 const DIR = process.argv[2] ?? join(process.cwd(), 'docs/bonus/Template file tính toán');
@@ -127,7 +128,30 @@ function taCredit() {
   check('TỔNG TA Credit', res.totals.amount, 3_220_000);
 }
 
-for (const [name, fn] of [['referral', referral], ['signon', signon], ['ta_credit', taCredit]] as const) {
+// ---------------- #10 Onsite ----------------
+// Sheet "Onsite Allowance": hàng 3+ = ngày (cột B), cột D.. = TA (ô = 1), các hàng cuối là Total / Rate / Amount.
+// Kỳ Nov'26 trả ngày onsite của chính tháng 11. So với tổng cột (3) ở sheet Summary.
+function onsite() {
+  const FILE = 'TA_Credit_Bonus_Nov26 (2).xlsx';
+  const rows = sheetRows(FILE, 'Onsite Allowance');
+  const head = rows.find((r) => str(r.B) === 'Onsite Date') ?? {};
+  const cols = Object.keys(head).filter((k) => k >= 'D' && k.length === 1 && str(head[k]));
+  const days: OnsiteDay[] = rows.filter((r) => r.B instanceof Date)
+    .flatMap((r) => cols.filter((k) => Number(r[k]) === 1).map((k) => ({ pic: `TA-${k}`, day: iso(r.B) ?? '' })));
+  const profiles: TaProfile[] = cols.map((k) => ({
+    pic: `TA-${k}`, name: '', emp_id: '', region: 'North', level: '', title: '', is_freelancer: false, onsite: true, active: true,
+  }));
+  const res = buildOnsitePeriod(days, profiles, PERIOD, ONSITE_DEFAULT_CONFIG);
+  const summary = sheetRows(FILE, "Summary Nov'26").filter((r) => typeof r.B === 'number').reduce((s, r) => s + (Number(r.H) || 0), 0);
+  const outside = days.filter((d) => !d.day.startsWith(PERIOD)).length;
+  console.log(`
+#10 Onsite – ${cols.length} TA, ${days.length} ô onsite, ${outside} ngày ngoài tháng ${PERIOD}`);
+  check('Tổng ngày onsite', res.totals.days, days.length - outside);
+  check('TỔNG Onsite (so với Summary cột 3)', res.totals.amount, summary);
+  check('TỔNG Onsite', res.totals.amount, 5_000_000);
+}
+
+for (const [name, fn] of [['referral', referral], ['signon', signon], ['ta_credit', taCredit], ['onsite', onsite]] as const) {
   try {
     fn();
   } catch (e) {
