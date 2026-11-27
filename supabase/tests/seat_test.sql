@@ -1,4 +1,4 @@
--- Quy trình 1 – mã ghế (0038 + 0039): RLS theo TA, luồng trạng thái, cấp mã liên tiếp, bộ đếm, nhật ký, tổng hợp.
+-- Quy trình 1 – mã ghế (0038 + 0039 + 0041): RLS theo TA, luồng trạng thái, cấp mã liên tiếp, bộ đếm, nhật ký, tổng hợp.
 -- Chạy:  psql -v ON_ERROR_STOP=1 -f supabase/tests/seat_test.sql   (1 giao dịch, ROLLBACK ở cuối)
 begin;
 do $$
@@ -29,13 +29,13 @@ begin
   assert (select owner_id from public.seat_requests where id = s1) = t1, 'owner = auth.uid()'; c := c + 1;
   begin
     insert into public.seat_requests (ban, vung, nhom_chuc_danh, ranking_ap, vi_tri_ap, so_luong, quan_ly_truc_tiep, status)
-    values ('X', 'Miền Nam', 'Rank 6', '6A', 'NV', 1, 'QL', 'gui');
+    values ('Chuỗi Cung Ứng', 'Miền Nam', 'Rank 6', '6A', 'NV', 1, 'QL', 'gui');
     assert false, 'TA không được tạo thẳng trạng thái gui';
   exception when others then assert sqlstate = '42501', 'insert gui: ' || sqlstate; c := c + 1;
   end;
   begin
     insert into public.seat_requests (ban, vung, nhom_chuc_danh, ranking_ap, vi_tri_ap, so_luong, quan_ly_truc_tiep)
-    values ('X', 'Miền Tây', 'Rank 6', '6A', 'NV', 1, 'QL');
+    values ('Chuỗi Cung Ứng', 'Miền Tây', 'Rank 6', '6A', 'NV', 1, 'QL');
     assert false, 'vùng ngoài danh sách phải bị chặn';
   exception when others then assert sqlstate = '23514', 'vùng sai: ' || sqlstate; c := c + 1;
   end;
@@ -130,6 +130,65 @@ begin
   delete from public.seat_requests where id = s3;
   execute 'reset role';
   assert exists (select 1 from public.audit_logs where action = 'SEAT_DELETE' and (changes ->> 'seat_id')::bigint = s3), 'log xóa'; c := c + 1;
+
+  -- ---------- 0041: dropdown phụ thuộc Ban → Đơn vị → Phòng → Đội → Tổ ----------
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.sub', t1::text, true);
+  insert into public.seat_requests (ban, don_vi, phong, doi, to_nhom, vung, nhom_chuc_danh, ranking_ap, vi_tri_ap, so_luong, quan_ly_truc_tiep)
+  values ('Chuỗi Cung Ứng', 'Ambient Logistics', 'Kho Ambient', 'Kho Bắc Ninh', 'Inbound', 'Miền Bắc', 'Rank 6', '6A', 'NV', 1, 'QL')
+  returning id into s2;
+  c := c + 1;  -- nhánh đầy đủ hợp lệ
+  insert into public.seat_requests (ban, don_vi, vung, nhom_chuc_danh, ranking_ap, vi_tri_ap, so_luong, quan_ly_truc_tiep)
+  values ('Chuỗi Cung Ứng', 'Ambient Logistics', 'Miền Bắc', 'Rank 6', '6A', 'NV', 1, 'QL');
+  c := c + 1;  -- dừng ở giữa nhánh: hợp lệ
+  begin
+    insert into public.seat_requests (ban, vung, nhom_chuc_danh, ranking_ap, vi_tri_ap, so_luong, quan_ly_truc_tiep)
+    values ('Ban không có', 'Miền Bắc', 'Rank 6', '6A', 'NV', 1, 'QL');
+    assert false, 'ban ngoài danh mục phải bị chặn';
+  exception when others then assert sqlerrm = 'SEAT_ORG_INVALID:ban', 'ban sai: ' || sqlerrm; c := c + 1;
+  end;
+  begin
+    insert into public.seat_requests (ban, don_vi, vung, nhom_chuc_danh, ranking_ap, vi_tri_ap, so_luong, quan_ly_truc_tiep)
+    values ('Chuỗi Cung Ứng', 'C&B', 'Miền Bắc', 'Rank 6', '6A', 'NV', 1, 'QL');
+    assert false, 'đơn vị không thuộc ban phải bị chặn';
+  exception when others then assert sqlerrm = 'SEAT_ORG_INVALID:don_vi', 'đơn vị sai ban: ' || sqlerrm; c := c + 1;
+  end;
+  begin
+    insert into public.seat_requests (ban, doi, vung, nhom_chuc_danh, ranking_ap, vi_tri_ap, so_luong, quan_ly_truc_tiep)
+    values ('Chuỗi Cung Ứng', 'Kho Phúc Long – Bình Dương', 'Miền Nam', 'Rank 6', '6A', 'NV', 1, 'QL');
+    assert false, 'bỏ trống cấp giữa phải bị chặn';
+  exception when others then assert sqlerrm = 'SEAT_ORG_HOLE:don_vi', 'lỗ hổng: ' || sqlerrm; c := c + 1;
+  end;
+  update public.seat_requests set to_nhom = 'Pick Pack', doi = 'Kho Cần Thơ' where id = s2;  -- đổi sang nhánh khác hợp lệ
+  c := c + 1;
+  begin
+    update public.seat_requests set to_nhom = 'Không có tổ này' where id = s2;
+    assert false, 'tổ ngoài nhánh phải bị chặn';
+  exception when others then assert sqlerrm = 'SEAT_ORG_INVALID:to_nhom', 'tổ sai: ' || sqlerrm; c := c + 1;
+  end;
+  update public.seat_requests set note = 'không đổi tổ chức' where id = s2;  -- không đụng 5 cột: không kiểm lại
+  c := c + 1;
+  begin
+    insert into public.seat_org_paths (ban) values ('TA không được thêm');
+    assert false, 'TA không được sửa danh mục';
+  exception when others then assert sqlstate = '42501', 'TA sửa danh mục: ' || sqlstate; c := c + 1;
+  end;
+  select count(*) into n from public.seat_org_paths;
+  assert n >= 107, 'TA đọc được danh mục, được ' || n; c := c + 1;
+  execute 'reset role';
+  -- Admin tắt nhánh -> không chọn được nữa; dòng cũ vẫn sửa được các cột khác
+  update public.seat_org_paths set active = false where ban = 'Pháp chế';
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.sub', t1::text, true);
+  begin
+    insert into public.seat_requests (ban, vung, nhom_chuc_danh, ranking_ap, vi_tri_ap, so_luong, quan_ly_truc_tiep)
+    values ('Pháp chế', 'Miền Bắc', 'Rank 6', '6A', 'NV', 1, 'QL');
+    assert false, 'nhánh đã tắt phải bị chặn';
+  exception when others then assert sqlerrm = 'SEAT_ORG_INVALID:ban', 'nhánh tắt: ' || sqlerrm; c := c + 1;
+  end;
+  execute 'reset role';
+  assert app.seat_org_error('Chuỗi Cung Ứng', 'Ambient Logistics', 'Kho Ambient', '', 'Inbound') = 'SEAT_ORG_HOLE:doi', 'hole doi'; c := c + 1;
+  assert app.seat_org_error(' Chuỗi Cung Ứng ', '', '', '', '') is null, 'cắt khoảng trắng'; c := c + 1;
 
   raise notice 'SEAT_TEST_PASSED: % check đạt', c;
 end $$;
