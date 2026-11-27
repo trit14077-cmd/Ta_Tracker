@@ -61,6 +61,8 @@ import {
   freelancerSheet,
   freelancerSummarySheet,
 } from '../../../shared/bonus/freelancerTemplate.ts';
+import { SUMMARY_KINDS, type SummaryKind, type SummaryMomRow, type SummaryRow } from '../../../shared/bonus/summary.ts';
+import { MOM_WIDTHS, SUMMARY_WIDTHS, summaryMomSheet, summarySheet, summarySheetName } from '../../../shared/bonus/summaryTemplate.ts';
 
 /** Một PIC kèm hồ sơ bonus (has_profile = đã có dòng ta_bonus_profiles). */
 export interface TaProfileRow extends TaProfile {
@@ -476,6 +478,21 @@ export const bonusService = {
     await downloadXlsxBook(`Freelancer_Bonus_${periodShort(period).replace("'", '')}_${stamp()}.xlsx`, [
       { name: FREELANCER_SHEET_NAME, rows: freelancerSheet(views, period), widths: FREELANCER_WIDTHS },
       { name: FREELANCER_SUMMARY_SHEET_NAME, rows: freelancerSummarySheet(views), widths: FREELANCER_SUMMARY_WIDTHS },
+    ]);
+  },
+
+  // ---------------- Tổng hợp chi trả task #10 (TA Credit + Onsite + Freelancer) ----------------
+  /** Kỳ + khoản đã chốt của 3 loại (mọi kỳ, để dựng cả bảng MoM). */
+  async payoutData(): Promise<{ periods: BonusPeriod[]; lines: BonusLine[] }> {
+    const ps = (await Promise.all(SUMMARY_KINDS.map((k: SummaryKind) => bonusService.periods(k)))).flat();
+    const lines = await bonusService.lines(ps.filter((p) => p.status === 'da_chot').map((p) => p.id));
+    return { periods: ps, lines };
+  },
+
+  async exportPayoutSummary(period: string, rows: SummaryRow[], totals: Pick<SummaryRow, 'credit' | 'onsite' | 'freelancer' | 'total'>, mom: SummaryMomRow[]): Promise<void> {
+    await downloadXlsxBook(`TA_Bonus_Summary_${periodShort(period).replace("'", '')}_${stamp()}.xlsx`, [
+      { name: summarySheetName(period), rows: summarySheet(rows, totals, period), widths: SUMMARY_WIDTHS },
+      { name: 'MoM', rows: summaryMomSheet(mom), widths: MOM_WIDTHS },
     ]);
   },
 };

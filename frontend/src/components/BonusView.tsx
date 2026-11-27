@@ -9,10 +9,11 @@ import { BonusSignonPanel, SignonSchemeSettings } from './BonusSignonPanel.tsx';
 import { BonusTaCreditPanel, TaCreditSettings, TaProfileSettings } from './BonusTaCreditPanel.tsx';
 import { BonusOnsitePanel, OnsiteSettings } from './BonusOnsitePanel.tsx';
 import { BonusFreelancerPanel, FreelancerSettings } from './BonusFreelancerPanel.tsx';
+import { BonusSummaryPanel } from './BonusSummaryPanel.tsx';
 import { cleanAmount, fmtVnd, periodLabel, type BonusKind } from '../../../shared/bonus/period.ts';
 import { REFERRAL_DEFAULT_RATES, cleanReferralRates, type ReferralRates } from '../../../shared/bonus/referral.ts';
 
-type Tab = 'referral' | 'signon' | 'ta_credit' | 'onsite' | 'freelancer' | 'settings' | 'mine';
+type Tab = 'referral' | 'signon' | 'ta_credit' | 'onsite' | 'freelancer' | 'summary' | 'settings' | 'mine';
 
 export const BONUS_KIND_LABELS: Record<BonusKind, string> = {
   referral: 'Referral', signon: 'Sign-on', ta_credit: 'TA Credit', onsite: 'Onsite', freelancer: 'Freelancer',
@@ -145,7 +146,7 @@ export const BonusView: React.FC<{ user: UserProfile; onOpenCandidate?: (id: num
   const isAdmin = user.role === 'admin';
   const [tab, setTab] = useState<Tab>(isAdmin ? 'referral' : 'mine');
   const tabs: { id: Tab; label: string }[] = isAdmin
-    ? [{ id: 'referral', label: 'Referral' }, { id: 'signon', label: 'Sign-on' }, { id: 'ta_credit', label: 'TA Credit' }, { id: 'onsite', label: 'Onsite' }, { id: 'freelancer', label: 'Freelancer' }, { id: 'settings', label: 'Cấu hình' }]
+    ? [{ id: 'referral', label: 'Referral' }, { id: 'signon', label: 'Sign-on' }, { id: 'ta_credit', label: 'TA Credit' }, { id: 'onsite', label: 'Onsite' }, { id: 'freelancer', label: 'Freelancer' }, { id: 'summary', label: 'Tổng hợp' }, { id: 'settings', label: 'Cấu hình' }]
     : [{ id: 'mine', label: 'Bonus của tôi' }];
   return (
     <div className="space-y-3">
@@ -162,6 +163,7 @@ export const BonusView: React.FC<{ user: UserProfile; onOpenCandidate?: (id: num
       {tab === 'ta_credit' && isAdmin && <BonusTaCreditPanel isAdmin={isAdmin} />}
       {tab === 'onsite' && isAdmin && <BonusOnsitePanel isAdmin={isAdmin} />}
       {tab === 'freelancer' && isAdmin && <BonusFreelancerPanel isAdmin={isAdmin} onOpenCandidate={onOpenCandidate} />}
+      {tab === 'summary' && isAdmin && <BonusSummaryPanel />}
       {tab === 'settings' && isAdmin && (
         <div className="space-y-3"><ReferralSettings /><SignonSchemeSettings /><TaProfileSettings /><TaCreditSettings /><OnsiteSettings /><FreelancerSettings /></div>
       )}

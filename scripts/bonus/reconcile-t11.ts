@@ -13,6 +13,8 @@ import {
   TA_CREDIT_DEFAULT_CONFIG, TA_LEVELS, buildTaCreditPeriod, obCredits, type TaCreditSource, type TaProfile,
 } from '../../shared/bonus/taCredit.ts';
 import { FREELANCER_DEFAULT_CONFIG, buildFreelancerPeriod, type Freelancer, type FreelancerSource } from '../../shared/bonus/freelancer.ts';
+import { buildPayoutSummary, type SummaryKind } from '../../shared/bonus/summary.ts';
+import type { BonusLineInput } from '../../shared/bonus/period.ts';
 import { ONSITE_DEFAULT_CONFIG, buildOnsitePeriod, type OnsiteDay } from '../../shared/bonus/onsite.ts';
 import { REFERRAL_DEFAULT_RATES, buildReferralPeriod, type ReferralSource, type YesNo } from '../../shared/bonus/referral.ts';
 
@@ -34,6 +36,7 @@ const str = (v: unknown) => (v == null ? '' : String(v).trim());
 const yn = (v: unknown): YesNo => (str(v) === 'Yes' ? 'Yes' : str(v) === 'No' ? 'No' : '');
 
 let fail = 0;
+const computed: Partial<Record<SummaryKind, BonusLineInput[]>> = {};
 function check(label: string, got: number, want: number) {
   const ok = got === want;
   if (!ok) fail = 1;
@@ -127,6 +130,7 @@ function taCredit() {
   check('Tổng credit', Math.round(res.totals.credits * 10), Math.round(excelCredits * 10));
   check('Số OB eligible', res.totals.eligible, 70);
   check('TỔNG TA Credit', res.totals.amount, 3_220_000);
+  computed.ta_credit = res.lines;
 }
 
 // ---------------- #10 Onsite ----------------
@@ -150,6 +154,7 @@ function onsite() {
   check('Tổng ngày onsite', res.totals.days, days.length - outside);
   check('TỔNG Onsite (so với Summary cột 3)', res.totals.amount, summary);
   check('TỔNG Onsite', res.totals.amount, 5_000_000);
+  computed.onsite = res.lines;
 }
 
 // ---------------- #10 Freelancer ----------------
@@ -175,9 +180,30 @@ function freelancer() {
   check('Net', res.totals.net, sum('K'));
   check('TỔNG Freelancer', res.totals.amount, sum('I'));
   check('TỔNG Freelancer (mốc)', res.totals.amount, 7_500_000);
+  computed.freelancer = res.lines;
 }
 
-for (const [name, fn] of [['referral', referral], ['signon', signon], ['ta_credit', taCredit], ['onsite', onsite], ['freelancer', freelancer]] as const) {
+// ---------------- #10 Tổng hợp (sheet Summary) ----------------
+// Gộp khoản của 3 loại theo người nhận; so dòng tổng (hàng có cột J mà không có số thứ tự ở cột B).
+function summary() {
+  const rows = sheetRows('TA_Credit_Bonus_Nov26 (2).xlsx', "Summary Nov'26");
+  const total = rows.find((r) => typeof r.B !== 'number' && typeof r.J === 'number' && typeof r.G === 'number');
+  if (!total) throw new Error('Không thấy dòng tổng của sheet Summary');
+  const s = buildPayoutSummary(computed);
+  // Excel không có mã PIC ở sheet Onsite / Nov'26 Bonus nên script không gộp được TA Onsite với TA Credit theo người
+  // (app gộp theo PIC). Chỉ so số CTV và số TA có Onsite.
+  const data = rows.filter((r) => typeof r.B === 'number');
+  console.log(`
+#10 Tổng hợp – app ${s.rows.length} dòng người nhận, Excel ${data.length} dòng`);
+  check('Số CTV', s.rows.filter((r) => r.type === 'freelancer').length, data.filter((r) => Number(r.I) > 0).length);
+  check('Số TA có Onsite', s.rows.filter((r) => r.onsite > 0).length, data.filter((r) => Number(r.H) > 0).length);
+  check('(2) TA Credit', s.totals.credit, Number(total.G));
+  check('(3) Onsite', s.totals.onsite, Number(total.H));
+  check('(4) Freelancer', s.totals.freelancer, Number(total.I));
+  check('(1) TỔNG CHI TRẢ', s.totals.total, Number(total.J));
+}
+
+for (const [name, fn] of [['referral', referral], ['signon', signon], ['ta_credit', taCredit], ['onsite', onsite], ['freelancer', freelancer], ['summary', summary]] as const) {
   try {
     fn();
   } catch (e) {
