@@ -33,3 +33,6 @@ __pycache__/
 # Python / công cụ
 .venv/
 *.pyc
+
+# Mail mẫu tham khảo (không đưa lên repo)
+docs/email-templates/
