@@ -186,6 +186,35 @@ begin
     assert false, 'nhánh đã tắt phải bị chặn';
   exception when others then assert sqlerrm = 'SEAT_ORG_INVALID:ban', 'nhánh tắt: ' || sqlerrm; c := c + 1;
   end;
+  -- Màn hình admin "Cây đơn vị" ghi bằng role authenticated: TA update/delete bị RLS lọc còn 0 dòng
+  update public.seat_org_paths set active = true where ban = 'Pháp chế';
+  get diagnostics n = row_count;
+  assert n = 0, 'TA không bật được nhánh, đổi ' || n; c := c + 1;
+  delete from public.seat_org_paths where ban = 'Chuỗi Cung Ứng';
+  get diagnostics n = row_count;
+  assert n = 0, 'TA không xóa được nhánh, xóa ' || n; c := c + 1;
+  -- Admin (authenticated + is_admin): thêm, đổi tên hàng loạt, tắt, xóa; DB chặn trùng và lỗ hổng
+  perform set_config('request.jwt.claim.sub', a::text, true);
+  insert into public.seat_org_paths (ban, don_vi) values ('Ban thử admin', 'Đơn vị A'), ('Ban thử admin', 'Đơn vị B');
+  update public.seat_org_paths set ban = 'Ban thử admin 2' where ban = 'Ban thử admin';
+  get diagnostics n = row_count;
+  assert n = 2, 'admin đổi tên 2 nhánh, đổi ' || n; c := c + 1;
+  begin
+    update public.seat_org_paths set don_vi = 'Đơn vị A' where ban = 'Ban thử admin 2' and don_vi = 'Đơn vị B';
+    assert false, 'đổi tên gây trùng phải bị chặn';
+  exception when others then assert sqlstate = '23505', 'trùng: ' || sqlstate; c := c + 1;
+  end;
+  begin
+    insert into public.seat_org_paths (ban, phong) values ('Ban thử admin 2', 'Phòng không có đơn vị');
+    assert false, 'nhánh có lỗ hổng phải bị chặn';
+  exception when others then assert sqlstate = '23514', 'lỗ hổng nhánh: ' || sqlstate; c := c + 1;
+  end;
+  update public.seat_org_paths set active = true where ban = 'Pháp chế';
+  get diagnostics n = row_count;
+  assert n >= 1, 'admin bật lại nhánh'; c := c + 1;
+  delete from public.seat_org_paths where ban = 'Ban thử admin 2';
+  get diagnostics n = row_count;
+  assert n = 2, 'admin xóa 2 nhánh, xóa ' || n; c := c + 1;
   execute 'reset role';
   assert app.seat_org_error('Chuỗi Cung Ứng', 'Ambient Logistics', 'Kho Ambient', '', 'Inbound') = 'SEAT_ORG_HOLE:doi', 'hole doi'; c := c + 1;
   assert app.seat_org_error(' Chuỗi Cung Ứng ', '', '', '', '') is null, 'cắt khoảng trắng'; c := c + 1;

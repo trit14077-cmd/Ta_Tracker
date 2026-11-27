@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
-  SEAT_ORG_MSG_HOLE, SEAT_ORG_MSG_INVALID, parseSeatOrgDbError, seatOrgError, seatOrgOptions, seatOrgSet, type SeatOrgPath,
+  SEAT_ORG_MSG_BAN_REQUIRED, SEAT_ORG_MSG_DUP, SEAT_ORG_MSG_HOLE, SEAT_ORG_MSG_INVALID, parseSeatOrgDbError, seatOrgClean,
+  seatOrgError, seatOrgOptions, seatOrgPathError, seatOrgRenamePlan, seatOrgSet, type SeatOrgPath,
 } from '../../shared/seatOrgTree.ts';
 
 const P = (ban: string, don_vi = '', phong = '', doi = '', to_nhom = ''): SeatOrgPath => ({ ban, don_vi, phong, doi, to_nhom });
@@ -68,6 +69,31 @@ describe('seatOrgSet / parseSeatOrgDbError', () => {
     expect(parseSeatOrgDbError('x SEAT_ORG_HOLE:phong y')).toEqual({ key: 'phong', msg: SEAT_ORG_MSG_HOLE });
     expect(parseSeatOrgDbError('SEAT_ORG_INVALID:abc')).toBeNull();
     expect(parseSeatOrgDbError('khác')).toBeNull();
+  });
+});
+
+describe('admin sửa cây (seatOrgPathError, seatOrgRenamePlan)', () => {
+  const rows = paths.map((p, i) => ({ ...p, id: i + 1 }));
+  it('chuẩn hóa khoảng trắng và NFC', () => {
+    expect(seatOrgClean({ ban: '  Pháp   chế ', don_vi: 'C&B' })).toEqual(P('Pháp chế', 'C&B'));
+    expect(seatOrgClean({ ban: 'Pháp chế' }).ban).toBe('Pháp chế');
+  });
+  it('Ban bắt buộc, không lỗ hổng', () => {
+    expect(seatOrgPathError({ don_vi: 'X' })).toEqual({ key: 'ban', msg: SEAT_ORG_MSG_BAN_REQUIRED });
+    expect(seatOrgPathError(P('A', '', 'B'))).toEqual({ key: 'don_vi', msg: SEAT_ORG_MSG_HOLE });
+    expect(seatOrgPathError(P('A', 'B', 'C', '', 'E'))).toEqual({ key: 'doi', msg: SEAT_ORG_MSG_HOLE });
+    expect(seatOrgPathError(P('Ban mới', 'Đơn vị mới'), rows)).toBeNull();
+  });
+  it('không trùng nhánh có sẵn, trừ chính nó khi sửa', () => {
+    expect(seatOrgPathError(P(' Chuỗi Cung Ứng', 'Cool Chain Logistics', 'Kho  Cool Chain'), rows))
+      .toEqual({ key: 'phong', msg: SEAT_ORG_MSG_DUP });
+    expect(seatOrgPathError(rows[3], rows, rows[3].id)).toBeNull();
+    expect(seatOrgPathError(rows[3], rows, rows[0].id)).not.toBeNull();
+  });
+  it('đổi tên: đếm nhánh bị đổi và nhánh sẽ trùng', () => {
+    expect(seatOrgRenamePlan(rows, 'don_vi', rows[0], 'AL')).toEqual({ changed: 3, conflicts: 0 });
+    expect(seatOrgRenamePlan(rows, 'doi', rows[0], 'Kho Cần Thơ')).toEqual({ changed: 2, conflicts: 1 });
+    expect(seatOrgRenamePlan(rows, 'ban', rows[0], 'CCU')).toEqual({ changed: 4, conflicts: 0 });
   });
 });
 
