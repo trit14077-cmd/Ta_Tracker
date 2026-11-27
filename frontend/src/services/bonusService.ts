@@ -2,7 +2,7 @@
 // Đọc theo RLS: admin thấy tất cả; TA chỉ thấy khoản có ta_pic = PIC của mình. Ghi chỉ qua RPC (admin).
 import { supabase } from '../lib/supabase.ts';
 import { downloadXlsxBook } from './xlsxDownload.ts';
-import { periodShort, type BonusKind, type BonusLineInput } from '../../../shared/bonus/period.ts';
+import { periodMonthRange, periodShort, type BonusKind, type BonusLineInput } from '../../../shared/bonus/period.ts';
 import { cleanReferralRates, referralMom, type ReferralPaidMap, type ReferralRates, type ReferralRow, type ReferralSource, type YesNo } from '../../../shared/bonus/referral.ts';
 import {
   REFERRAL_LIST_WIDTHS,
@@ -29,6 +29,25 @@ import {
   signonPeriodSheetName,
   signonSummarySheet,
 } from '../../../shared/bonus/signonTemplate.ts';
+
+import {
+  cleanTaCreditConfig,
+  type TaCreditConfig,
+  type TaCreditOb,
+  type TaCreditRow,
+  type TaCreditSource,
+  type TaLevel,
+  type TaProfile,
+  type TaRegion,
+} from '../../../shared/bonus/taCredit.ts';
+import { OB_LIST_WIDTHS, TA_BONUS_WIDTHS, obListSheet, obListSheetName, taBonusSheet, taBonusSheetName } from '../../../shared/bonus/taCreditTemplate.ts';
+
+/** Một PIC kèm hồ sơ bonus (has_profile = đã có dòng ta_bonus_profiles). */
+export interface TaProfileRow extends TaProfile {
+  has_profile: boolean;
+  pic_active: boolean;
+  note: string;
+}
 
 /** Sửa tay một hồ sơ Sign-on: scheme ('' = tự gán), cờ từng mốc, ghi chú. */
 export interface SignonPatch {
@@ -275,6 +294,60 @@ export const bonusService = {
       { name: 'Sign-on Details', rows: signonDetailsSheet(all, keys), widths: signonDetailsWidths(all, keys) },
       { name: signonPeriodSheetName(period), rows: signonPeriodSheet(rows, period), widths: SIGNON_PERIOD_WIDTHS },
       { name: 'summary', rows: signonSummarySheet(mom), widths: [10, 16, 14, 16] },
+    ]);
+  },
+
+  // ---------------- TA Credit (task #10 phần 2) ----------------
+  async taCreditConfig(): Promise<TaCreditConfig> {
+    return cleanTaCreditConfig(await bonusService.settings('ta_credit'));
+  },
+
+  /** Mọi PIC + hồ sơ bonus (admin thấy tất cả; TA chỉ thấy hồ sơ của mình theo RLS). */
+  async taProfiles(): Promise<TaProfileRow[]> {
+    const [pics, profs] = await Promise.all([
+      supabase.from('pics').select('code, name, active').order('sort_order').order('code'),
+      supabase.from('ta_bonus_profiles').select('*'),
+    ]);
+    if (pics.error) throw bonusError(pics.error, 'Không tải được danh sách PIC.');
+    if (profs.error) throw bonusError(profs.error, 'Không tải được hồ sơ bonus TA.');
+    const m = new Map(((profs.data ?? []) as Record<string, unknown>[]).map((p) => [String(p.pic_code), p]));
+    const s = (v: unknown) => (v == null ? '' : String(v));
+    return ((pics.data ?? []) as Record<string, unknown>[]).map((p) => {
+      const b = m.get(String(p.code));
+      return {
+        pic: s(p.code), name: s(p.name), pic_active: p.active !== false, has_profile: Boolean(b),
+        emp_id: s(b?.emp_id), region: s(b?.region) as TaRegion | '', level: s(b?.level) as TaLevel | '', title: s(b?.title),
+        is_freelancer: Boolean(b?.is_freelancer), onsite: Boolean(b?.onsite), active: b ? b.active !== false : false, note: s(b?.note),
+      };
+    });
+  },
+
+  async saveTaProfile(p: Omit<TaProfileRow, 'name' | 'has_profile' | 'pic_active'>): Promise<void> {
+    const { pic, ...rest } = p;
+    const { error } = await supabase.rpc('ta_bonus_profile_save', { p: { pic_code: pic, ...rest } });
+    if (error) throw bonusError(error, 'Không lưu được hồ sơ bonus TA.');
+  },
+
+  /** OB Joined có OBD trong tháng `perfMonth` ('YYYY-MM'). */
+  async taCreditSources(perfMonth: string): Promise<TaCreditSource[]> {
+    const { from, to } = periodMonthRange(perfMonth);
+    const { data, error } = await supabase.from('recruitment_records')
+      .select('id, candidate_code, full_name, emp_id, pic, rank, region, unit, site, ob_date, ob_status, emp_status, attrition_date')
+      .eq('ob_status', 'Joined').eq('is_archived', false).gte('ob_date', from).lte('ob_date', to)
+      .order('ob_date').limit(5000);
+    if (error) throw bonusError(error, 'Không tải được danh sách OB.');
+    const s = (v: unknown) => (v == null ? '' : String(v));
+    return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+      record_id: Number(r.id), candidate_code: s(r.candidate_code), full_name: s(r.full_name), emp_id: s(r.emp_id),
+      pic: (r.pic as string) ?? null, rank: s(r.rank), region: s(r.region), unit: s(r.unit), site: s(r.site),
+      ob_date: (r.ob_date as string) ?? null, ob_status: s(r.ob_status), emp_status: s(r.emp_status), attrition_date: (r.attrition_date as string) ?? null,
+    }));
+  },
+
+  async exportTaCredit(period: string, perfMonth: string, rows: TaCreditRow[], obs: TaCreditOb[]): Promise<void> {
+    await downloadXlsxBook(`TA_Credit_Bonus_${periodShort(period).replace("'", '')}_${stamp()}.xlsx`, [
+      { name: taBonusSheetName(period), rows: taBonusSheet(rows, period), widths: TA_BONUS_WIDTHS },
+      { name: obListSheetName(perfMonth), rows: obListSheet(obs), widths: OB_LIST_WIDTHS },
     ]);
   },
 };

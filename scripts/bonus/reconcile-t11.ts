@@ -9,6 +9,9 @@ import {
   SIGNON_DEFAULT_SCHEMES, autoScheme, buildSignonPeriod, partOf, suggestFlag,
   type SignonFlag, type SignonPaidMap, type SignonSource,
 } from '../../shared/bonus/signon.ts';
+import {
+  TA_CREDIT_DEFAULT_CONFIG, TA_LEVELS, buildTaCreditPeriod, obCredits, type TaCreditSource, type TaProfile,
+} from '../../shared/bonus/taCredit.ts';
 import { REFERRAL_DEFAULT_RATES, buildReferralPeriod, type ReferralSource, type YesNo } from '../../shared/bonus/referral.ts';
 
 const DIR = process.argv[2] ?? join(process.cwd(), 'docs/bonus/Template file tính toán');
@@ -23,7 +26,8 @@ function sheetRows(file: string, sheet: string): Row[] {
   if (!ws) throw new Error(`Không thấy sheet "${sheet}" trong ${file}`);
   return XLSX.utils.sheet_to_json<Row>(ws, { header: 'A', defval: null, raw: true });
 }
-const iso = (v: unknown): string | null => (v instanceof Date ? v.toISOString().slice(0, 10) : null);
+// Ngày theo giờ Việt Nam: vài ô lưu 00:00 +07 (= 17:00 UTC hôm trước) do xuất từ Google Sheets.
+const iso = (v: unknown): string | null => (v instanceof Date ? new Date(v.getTime() + 7 * 3_600_000).toISOString().slice(0, 10) : null);
 const str = (v: unknown) => (v == null ? '' : String(v).trim());
 const yn = (v: unknown): YesNo => (str(v) === 'Yes' ? 'Yes' : str(v) === 'No' ? 'No' : '');
 
@@ -57,7 +61,7 @@ function referral() {
 
 // ---------------- #9 Sign-on ----------------
 // Cờ Passed/Failed của Excel dùng làm cờ sửa tay; ô trống = Excel chưa xét → 'Hold'. Mốc đã có Payment Status
-// của kỳ trước = đã chốt. Ngày chốt kỳ Nov'26 = 25/11/2026 (mốc trễ nhất trả trong kỳ).
+// của kỳ trước = đã chốt. Ngày chốt kỳ Nov'26 = 26/11/2026 (mốc trễ nhất trả trong kỳ).
 function signon() {
   const rows = sheetRows("Sign-on Bonus Payment _ Nov'26 Pay Period.xlsx", 'Sign-on Details').filter((r) => r.E instanceof Date);
   const MS = [['I', 'J', 'K', 'L'], ['M', 'N', 'O', 'P'], ['Q', 'R', 'S', 'T'], ['U', 'V', 'W', 'X']] as const;
@@ -85,7 +89,7 @@ function signon() {
     });
     return src;
   });
-  const res = buildSignonPeriod(sources, paid, PERIOD, '2026-11-25', SIGNON_DEFAULT_SCHEMES);
+  const res = buildSignonPeriod(sources, paid, PERIOD, '2026-11-26', SIGNON_DEFAULT_SCHEMES);
   const excelNov = rows.reduce((s, r) => s + (Number(r.AD) || 0), 0);
   const sheetNov = sheetRows("Sign-on Bonus Payment _ Nov'26 Pay Period.xlsx", '112026').filter((r) => typeof r.B === 'number' && typeof r.J === 'number');
   console.log(`\n#9 Sign-on – ${rows.length} người, ${res.lines.length} mốc vào kỳ, ${res.unassigned.length} chưa có scheme`);
@@ -96,7 +100,34 @@ function signon() {
   check('TỔNG Sign-on', res.totals.total, 50_000_000);
 }
 
-for (const [name, fn] of [['referral', referral], ['signon', signon]] as const) {
+// ---------------- #10 TA Credit ----------------
+// OB tháng 10 (sheet ob_list_Oct'26) trả ở kỳ Nov'26. Level / Region của TA lấy ở settings!O:R (PIC, Region, Level, chức danh).
+function taCredit() {
+  const FILE = 'TA_Credit_Bonus_Nov26 (2).xlsx';
+  const obs = sheetRows(FILE, "ob_list_Oct'26").filter((r) => r.N instanceof Date && str(r.B));
+  const sources: TaCreditSource[] = obs.map((r, i) => ({
+    record_id: i + 1, candidate_code: `C${i + 1}`, full_name: '', emp_id: str(r.P), pic: str(r.B), rank: str(r.F), region: str(r.I), unit: str(r.K),
+    site: str(r.M), ob_date: iso(r.N), ob_status: str(r.O), emp_status: str(r.Q), attrition_date: iso(r.R),
+  }));
+  const profiles: TaProfile[] = sheetRows(FILE, 'settings')
+    .filter((r) => str(r.O) && (str(r.P) === 'North' || str(r.P) === 'South') && (TA_LEVELS as readonly string[]).includes(str(r.Q)))
+    .map((r) => ({
+      pic: str(r.O), name: '', emp_id: '', region: str(r.P) as TaProfile['region'], level: str(r.Q) as TaProfile['level'],
+      title: str(r.R), is_freelancer: false, onsite: false, active: true,
+    }));
+  const cfg = TA_CREDIT_DEFAULT_CONFIG;
+  const res = buildTaCreditPeriod(sources, profiles, PERIOD, '2026-11-26', cfg);
+  const excelCredits = obs.reduce((s, r) => s + (Number(r.H) || 0), 0);
+  const creditDiff = sources.filter((s, i) => obCredits(s, cfg) !== Number(obs[i].H)).length;
+  const noIntern = buildTaCreditPeriod(sources, profiles, PERIOD, '2026-11-26', { ...cfg, internBaseRate: 0 }).totals.amount;
+  console.log(`\n#10 TA Credit – ${obs.length} OB, ${profiles.length} hồ sơ TA, ${res.rows.filter((r) => r.problem).length} PIC thiếu hồ sơ, ${res.skipped.length} OB bị loại`);
+  console.log(`   OB có credit khác cột H: ${creditDiff} | nếu Intern Base trả 0: ${fmtVnd(noIntern)}`);
+  check('Tổng credit', Math.round(res.totals.credits * 10), Math.round(excelCredits * 10));
+  check('Số OB eligible', res.totals.eligible, 70);
+  check('TỔNG TA Credit', res.totals.amount, 3_220_000);
+}
+
+for (const [name, fn] of [['referral', referral], ['signon', signon], ['ta_credit', taCredit]] as const) {
   try {
     fn();
   } catch (e) {
