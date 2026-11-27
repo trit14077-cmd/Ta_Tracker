@@ -20,7 +20,7 @@ import {
   vnTodayIso,
   type CnbCheckKey,
 } from '../../../shared/cnbRules.ts';
-import { displayDate } from '../../../shared/cnbTemplate.ts';
+import { CNB_SHORT_HEADERS, displayDate, toCnbShortRow } from '../../../shared/cnbTemplate.ts';
 import { HR_STATUS_LABELS, hrMissingCount, type HrStatus } from '../../../shared/hrInfoRules.ts';
 
 type Tab = 'preview' | 'locked';
@@ -42,6 +42,22 @@ const DocMarks: React.FC<{ r: CnbPreviewRow | CnbItem['src'] }> = ({ r }) => (
     })}
   </span>
 );
+
+// Bảng danh sách kỳ = đúng 16 cột, đúng thứ tự của sheet CnB (tab OBT11/26) = file "Xuất bản gọn".
+const SHORT_I = Object.fromEntries(CNB_SHORT_HEADERS.map((h, i) => [h, i])) as Record<(typeof CNB_SHORT_HEADERS)[number], number>;
+const SHORT_DOC_COLS = new Set([SHORT_I['Bằng cấp'], SHORT_I.GKSK, SHORT_I.CCCD, SHORT_I.SYLL]);
+
+const ShortCell: React.FC<{ i: number; v: string }> = ({ i, v }) => {
+  const td = 'px-3 py-1.5 whitespace-nowrap';
+  if (SHORT_DOC_COLS.has(i)) {
+    return <td className={`${td} text-center font-medium ${v === 'x' ? 'text-emerald-700' : 'text-red-600'}`}>{v}</td>;
+  }
+  if (!v && (i === SHORT_I['Emp ID'] || i === SHORT_I['Tình trạng chi lương'])) {
+    return <td className={`${td} text-red-600`}>{i === SHORT_I['Emp ID'] ? '—' : 'Chưa chọn'}</td>;
+  }
+  const mono = i === SHORT_I['Emp ID'] ? ' font-mono' : i === SHORT_I.OBD || i === SHORT_I.Attrition_Date ? ' tabular-nums' : '';
+  return <td className={`${td}${mono}`}>{v}</td>;
+};
 
 const HrCell: React.FC<{ status?: string | null; data?: Record<string, unknown> | null }> = ({ status, data }) => {
   const missing = hrMissingCount((data ?? {}) as Record<string, string>);
@@ -303,39 +319,25 @@ export const CnbObView: React.FC<{ user: UserProfile; onOpenCandidate?: (id: num
             <thead className="bg-slate-50 text-slate-600">
               <tr>
                 <th className="px-3 py-2 text-left">Mã UV</th>
-                <th className="px-3 py-2 text-left">Emp ID</th>
-                <th className="px-3 py-2 text-left">Họ tên</th>
-                <th className="px-3 py-2 text-left">Vị trí</th>
-                <th className="px-3 py-2 text-left">Site</th>
-                <th className="px-3 py-2 text-left">OBD</th>
-                {isAdmin && <th className="px-3 py-2 text-left">TA</th>}
-                <th className="px-3 py-2 text-left">Chi lương</th>
-                <th className="px-3 py-2 text-left">Emp_STT</th>
+                {CNB_SHORT_HEADERS.map((h, i) => (
+                  <th key={h} className={`px-3 py-2 whitespace-nowrap ${SHORT_DOC_COLS.has(i) ? 'text-center' : 'text-left'}`}>{h}</th>
+                ))}
                 <th className="px-3 py-2 text-left">TT nhân sự</th>
-                <th className="px-3 py-2 text-left">Giấy tờ</th>
                 <th className="px-3 py-2 text-left">Kết quả</th>
                 {isAdmin && locked && <th className="px-3 py-2" />}
               </tr>
             </thead>
             <tbody>
               {visible.length === 0 && (
-                <tr><td colSpan={14} className="px-3 py-4 text-center text-slate-400">{loading ? 'Đang tải…' : 'Không có dòng phù hợp.'}</td></tr>
+                <tr><td colSpan={CNB_SHORT_HEADERS.length + 4} className="px-3 py-4 text-center text-slate-400">{loading ? 'Đang tải…' : 'Không có dòng phù hợp.'}</td></tr>
               )}
               {visible.map(({ r, ev }) => (
                 <tr key={r.record_id} className="border-t border-slate-100 hover:bg-slate-50">
                   <td className="px-3 py-1.5">
                     <button type="button" className="text-blue-700 hover:underline" onClick={() => onOpenCandidate?.(r.record_id)}>{r.candidate_code}</button>
                   </td>
-                  <td className="px-3 py-1.5 font-mono">{r.emp_id || <span className="text-red-600">—</span>}</td>
-                  <td className="px-3 py-1.5">{r.full_name}</td>
-                  <td className="px-3 py-1.5">{r.position}</td>
-                  <td className="px-3 py-1.5">{r.site}</td>
-                  <td className="px-3 py-1.5 tabular-nums">{displayDate(r.ob_date)}</td>
-                  {isAdmin && <td className="px-3 py-1.5">{r.pic}</td>}
-                  <td className="px-3 py-1.5">{r.salary_pay_status || <span className="text-red-600">Chưa chọn</span>}</td>
-                  <td className="px-3 py-1.5">{r.emp_status || '—'}</td>
+                  {toCnbShortRow(r).map((v, i) => <ShortCell key={CNB_SHORT_HEADERS[i]} i={i} v={v} />)}
                   <td className="px-3 py-1.5"><HrCell status={r.hr_status} data={r.hr} /></td>
-                  <td className="px-3 py-1.5"><DocMarks r={r} /></td>
                   <td className="px-3 py-1.5">
                     {ev.ok
                       ? <span className="text-emerald-700">{inItems.has(r.record_id) ? 'Đã chốt' : 'Đủ điều kiện'}</span>

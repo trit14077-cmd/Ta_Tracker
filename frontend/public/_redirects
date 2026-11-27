@@ -1,3 +1,4 @@
-# Form ứng tuyển công khai: /apply và /apply/* trả về apply.html (giữ nguyên URL)
-/apply        /apply.html   200
-/apply/*      /apply.html   200
+# Form ứng tuyển công khai: Cloudflare Pages tự phục vụ /apply từ apply.html (pretty URL).
+# KHÔNG thêm "/apply /apply.html 200": Pages đổi /apply.html -> /apply (308) => vòng lặp chuyển hướng (lỗi 27/11/2026).
+# Mã TA nằm ở query ?apply=..., không cần /apply/*.
+/apply/*      /apply        302
