@@ -181,6 +181,10 @@ jobs:
         run: |
           psql -v ON_ERROR_STOP=1 -f supabase/tests/bonus_onsite_test.sql 2>&1 | tee bonus_onsite.log
           grep -q "BONUS_ONSITE_TEST_PASSED" bonus_onsite.log
+      - name: Bonus Freelancer (0049) – danh sách CTV, gán CTV cho hồ sơ, khóa khi đã chốt, chỉ admin đọc (tự rollback)
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/bonus_freelancer_test.sql 2>&1 | tee bonus_freelancer.log
+          grep -q "BONUS_FREELANCER_TEST_PASSED" bonus_freelancer.log
       - name: 20 phiên đồng thời tạo mã cùng PIC không trùng
         run: bash supabase/tests/concurrency_codes.sh
 

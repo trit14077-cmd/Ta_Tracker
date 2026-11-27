@@ -12,6 +12,7 @@ import {
 import {
   TA_CREDIT_DEFAULT_CONFIG, TA_LEVELS, buildTaCreditPeriod, obCredits, type TaCreditSource, type TaProfile,
 } from '../../shared/bonus/taCredit.ts';
+import { FREELANCER_DEFAULT_CONFIG, buildFreelancerPeriod, type Freelancer, type FreelancerSource } from '../../shared/bonus/freelancer.ts';
 import { ONSITE_DEFAULT_CONFIG, buildOnsitePeriod, type OnsiteDay } from '../../shared/bonus/onsite.ts';
 import { REFERRAL_DEFAULT_RATES, buildReferralPeriod, type ReferralSource, type YesNo } from '../../shared/bonus/referral.ts';
 
@@ -151,7 +152,32 @@ function onsite() {
   check('TỔNG Onsite', res.totals.amount, 5_000_000);
 }
 
-for (const [name, fn] of [['referral', referral], ['signon', signon], ['ta_credit', taCredit], ['onsite', onsite]] as const) {
+// ---------------- #10 Freelancer ----------------
+// Sheet "Freelancer Bonus": mỗi dòng một ứng viên (B = CTV, D = Emp ID, E = Working Status, F = DC, H = OBD, I/J/K = Bonus/PIT/Net).
+// Tên CTV chỉ dùng để gom (đổi thành id trong bộ nhớ, không in). Ngày chốt 26/11/2026.
+function freelancer() {
+  const FILE = 'TA_Credit_Bonus_Nov26 (2).xlsx';
+  const rows = sheetRows(FILE, 'Freelancer Bonus').filter((r) => str(r.B) && r.H instanceof Date);
+  const ids = new Map<string, number>();
+  for (const r of rows) if (!ids.has(str(r.B))) ids.set(str(r.B), ids.size + 1);
+  const fl: Freelancer[] = [...ids.values()].map((id) => ({ id, name: `CTV ${id}`, phone: '', region: '', note: '', active: true }));
+  const sources: FreelancerSource[] = rows.map((r, i) => ({
+    record_id: i + 1, candidate_code: `C${i + 1}`, full_name: '', emp_id: str(r.D), position: str(r.G), site: str(r.F), sub_source: 'Freelancer',
+    pic: null, ob_date: iso(r.H), ob_status: 'Joined', emp_status: str(r.E), attrition_date: null, freelancer_id: ids.get(str(r.B)) ?? null, flag: '', note: '',
+  }));
+  const res = buildFreelancerPeriod(sources, fl, new Map(), PERIOD, '2026-11-26', FREELANCER_DEFAULT_CONFIG);
+  const sum = (k: string) => rows.reduce((s, r) => s + (Number(r[k]) || 0), 0);
+  const perRowDiff = res.lines.filter((l) => l.amount !== Number(rows[(l.record_id ?? 0) - 1].I)).length;
+  console.log(`
+#10 Freelancer – ${rows.length} ứng viên, ${ids.size} CTV, ${res.rows.filter((r) => r.state !== 'due').length} không vào kỳ, ${perRowDiff} dòng lệch mức`);
+  check('Số ứng viên được trả', res.totals.people, rows.length);
+  check('PIT', res.totals.pit, sum('J'));
+  check('Net', res.totals.net, sum('K'));
+  check('TỔNG Freelancer', res.totals.amount, sum('I'));
+  check('TỔNG Freelancer (mốc)', res.totals.amount, 7_500_000);
+}
+
+for (const [name, fn] of [['referral', referral], ['signon', signon], ['ta_credit', taCredit], ['onsite', onsite], ['freelancer', freelancer]] as const) {
   try {
     fn();
   } catch (e) {

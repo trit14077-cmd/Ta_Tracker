@@ -43,6 +43,24 @@ import {
 import { OB_LIST_WIDTHS, TA_BONUS_WIDTHS, obListSheet, obListSheetName, taBonusSheet, taBonusSheetName } from '../../../shared/bonus/taCreditTemplate.ts';
 import { cleanOnsiteConfig, type OnsiteConfig, type OnsiteDay, type OnsiteRow } from '../../../shared/bonus/onsite.ts';
 import { ONSITE_SHEET_NAME, onsiteSheet, onsiteSheetWidths } from '../../../shared/bonus/onsiteTemplate.ts';
+import {
+  cleanFreelancerConfig,
+  cleanFreelancerFlag,
+  type Freelancer,
+  type FreelancerConfig,
+  type FreelancerFlag,
+  type FreelancerLineView,
+  type FreelancerPaidMap,
+  type FreelancerSource,
+} from '../../../shared/bonus/freelancer.ts';
+import {
+  FREELANCER_SHEET_NAME,
+  FREELANCER_SUMMARY_SHEET_NAME,
+  FREELANCER_SUMMARY_WIDTHS,
+  FREELANCER_WIDTHS,
+  freelancerSheet,
+  freelancerSummarySheet,
+} from '../../../shared/bonus/freelancerTemplate.ts';
 
 /** Một PIC kèm hồ sơ bonus (has_profile = đã có dòng ta_bonus_profiles). */
 export interface TaProfileRow extends TaProfile {
@@ -377,6 +395,87 @@ export const bonusService = {
     const n = rows.filter((r) => r.count > 0 && !r.problem).length;
     await downloadXlsxBook(`TA_Onsite_Allowance_${periodShort(period).replace("'", '')}_${stamp()}.xlsx`, [
       { name: ONSITE_SHEET_NAME, rows: onsiteSheet(rows, period, rate), widths: onsiteSheetWidths(n) },
+    ]);
+  },
+
+  // ---------------- Freelancer (task #10 phần 4) ----------------
+  async freelancerConfig(): Promise<FreelancerConfig> {
+    return cleanFreelancerConfig(await bonusService.settings('freelancer'));
+  },
+
+  async freelancers(): Promise<Freelancer[]> {
+    const { data, error } = await supabase.from('bonus_freelancers').select('id, name, phone, region, note, active').order('name').limit(5000);
+    if (error) throw bonusError(error, 'Không tải được danh sách CTV.');
+    return ((data ?? []) as Record<string, unknown>[]).map((f) => ({
+      id: Number(f.id), name: String(f.name ?? ''), phone: String(f.phone ?? ''), region: String(f.region ?? '') as Freelancer['region'],
+      note: String(f.note ?? ''), active: f.active !== false,
+    }));
+  },
+
+  /** id = null → tạo CTV mới. Trả id. */
+  async saveFreelancer(f: Omit<Freelancer, 'id'> & { id: number | null }): Promise<number> {
+    const { data, error } = await supabase.rpc('bonus_freelancer_save', { p: f });
+    if (error) {
+      if (error.details === 'duplicate') throw new Error('Đã có CTV cùng tên và số điện thoại.');
+      throw bonusError(error, 'Không lưu được CTV.');
+    }
+    return Number((data as { id: number }).id);
+  },
+
+  /**
+   * Hồ sơ nguồn Freelancer đã Joined có OBD từ `fromDate`, cộng mọi hồ sơ đã gán CTV (kể cả cũ hơn hoặc nguồn khác),
+   * kèm CTV / cờ / ghi chú admin nhập.
+   */
+  async freelancerSources(fromDate: string): Promise<FreelancerSource[]> {
+    const COLS = 'id, candidate_code, full_name, emp_id, position, site, sub_source, pic, ob_date, ob_status, emp_status, attrition_date';
+    const [recent, links] = await Promise.all([
+      supabase.from('recruitment_records').select(COLS)
+        .eq('sub_source', 'Freelancer').eq('ob_status', 'Joined').eq('is_archived', false).gte('ob_date', fromDate)
+        .order('ob_date').limit(5000),
+      supabase.from('bonus_freelancer_records').select('record_id, freelancer_id, flag, note').limit(20000),
+    ]);
+    if (recent.error) throw bonusError(recent.error, 'Không tải được danh sách hồ sơ Freelancer.');
+    if (links.error) throw bonusError(links.error, 'Không tải được thông tin CTV của hồ sơ.');
+    const recs = new Map(((recent.data ?? []) as Record<string, unknown>[]).map((r) => [Number(r.id), r]));
+    const link = new Map(((links.data ?? []) as Record<string, unknown>[]).map((l) => [Number(l.record_id), l]));
+    const missing = [...link.entries()].filter(([id, l]) => l.freelancer_id != null && !recs.has(id)).map(([id]) => id);
+    for (let i = 0; i < missing.length; i += 500) {
+      const { data, error } = await supabase.from('recruitment_records').select(COLS).eq('is_archived', false).in('id', missing.slice(i, i + 500));
+      if (error) throw bonusError(error, 'Không tải được danh sách hồ sơ Freelancer.');
+      for (const r of (data ?? []) as Record<string, unknown>[]) recs.set(Number(r.id), r);
+    }
+    const s = (v: unknown) => (v == null ? '' : String(v));
+    return [...recs.values()].map((r) => {
+      const l = link.get(Number(r.id));
+      return {
+        record_id: Number(r.id), candidate_code: s(r.candidate_code), full_name: s(r.full_name), emp_id: s(r.emp_id), position: s(r.position),
+        site: s(r.site), sub_source: s(r.sub_source), pic: (r.pic as string) ?? null, ob_date: (r.ob_date as string) ?? null,
+        ob_status: s(r.ob_status), emp_status: s(r.emp_status), attrition_date: (r.attrition_date as string) ?? null,
+        freelancer_id: l?.freelancer_id == null ? null : Number(l.freelancer_id), flag: cleanFreelancerFlag(l?.flag), note: s(l?.note),
+      };
+    }).sort((a, b) => String(a.ob_date).localeCompare(String(b.ob_date)) || a.record_id - b.record_id);
+  },
+
+  async saveFreelancerRecord(recordId: number, patch: { freelancer_id?: number | null; flag?: FreelancerFlag; note?: string }): Promise<void> {
+    const { error } = await supabase.rpc('bonus_freelancer_record_save', { p_record_id: recordId, p: patch });
+    if (error) throw bonusError(error, 'Không lưu được thông tin CTV của hồ sơ.');
+  },
+
+  /** Hồ sơ đã chốt ở các kỳ Freelancer: record_id → { period, amount }. */
+  freelancerPaid(periods: BonusPeriod[], lines: BonusLine[]): FreelancerPaidMap {
+    const key = new Map(periods.map((p) => [p.id, p.period_key]));
+    const m: FreelancerPaidMap = new Map();
+    for (const l of lines) {
+      const k = key.get(l.period_id);
+      if (l.record_id != null && k && l.part === 'freelancer') m.set(l.record_id, { period: k, amount: l.amount });
+    }
+    return m;
+  },
+
+  async exportFreelancer(period: string, views: FreelancerLineView[]): Promise<void> {
+    await downloadXlsxBook(`Freelancer_Bonus_${periodShort(period).replace("'", '')}_${stamp()}.xlsx`, [
+      { name: FREELANCER_SHEET_NAME, rows: freelancerSheet(views, period), widths: FREELANCER_WIDTHS },
+      { name: FREELANCER_SUMMARY_SHEET_NAME, rows: freelancerSummarySheet(views), widths: FREELANCER_SUMMARY_WIDTHS },
     ]);
   },
 };
