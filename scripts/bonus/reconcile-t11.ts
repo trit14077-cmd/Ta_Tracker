@@ -4,7 +4,11 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as XLSX from 'xlsx';
-import { fmtVnd } from '../../shared/bonus/period.ts';
+import { fmtVnd, periodKeyOfLabel } from '../../shared/bonus/period.ts';
+import {
+  SIGNON_DEFAULT_SCHEMES, autoScheme, buildSignonPeriod, partOf, suggestFlag,
+  type SignonFlag, type SignonPaidMap, type SignonSource,
+} from '../../shared/bonus/signon.ts';
 import { REFERRAL_DEFAULT_RATES, buildReferralPeriod, type ReferralSource, type YesNo } from '../../shared/bonus/referral.ts';
 
 const DIR = process.argv[2] ?? join(process.cwd(), 'docs/bonus/Template file tính toán');
@@ -51,7 +55,48 @@ function referral() {
   console.log(`   dòng có Eligible = No (chịu ảnh hưởng của sửa lỗi): ${fixed}`);
 }
 
-for (const [name, fn] of [['referral', referral]] as const) {
+// ---------------- #9 Sign-on ----------------
+// Cờ Passed/Failed của Excel dùng làm cờ sửa tay; ô trống = Excel chưa xét → 'Hold'. Mốc đã có Payment Status
+// của kỳ trước = đã chốt. Ngày chốt kỳ Nov'26 = 25/11/2026 (mốc trễ nhất trả trong kỳ).
+function signon() {
+  const rows = sheetRows("Sign-on Bonus Payment _ Nov'26 Pay Period.xlsx", 'Sign-on Details').filter((r) => r.E instanceof Date);
+  const MS = [['I', 'J', 'K', 'L'], ['M', 'N', 'O', 'P'], ['Q', 'R', 'S', 'T'], ['U', 'V', 'W', 'X']] as const;
+  const paid: SignonPaidMap = new Map();
+  let autoDiff = 0;
+  let suggestDiff = 0;
+  const sources: SignonSource[] = rows.map((r, i) => {
+    const flags: Record<string, SignonFlag> = {};
+    const p: Record<string, { period: string; amount: number }> = {};
+    MS.forEach(([, e, b, st], k) => {
+      const f = str(r[e]);
+      flags[partOf(k)] = f === 'Passed' || f === 'Failed' ? f : f === 'Not Applicable' ? '' : 'Hold';
+      const key = periodKeyOfLabel(r[st]);
+      if (key && key < PERIOD) p[partOf(k)] = { period: key, amount: Number(r[b]) || 0 };
+    });
+    if (Object.keys(p).length) paid.set(i + 1, p);
+    const src: SignonSource = {
+      record_id: i + 1, candidate_code: `S${i + 1}`, full_name: '', emp_id: str(r.D), rank: '6A', dc: str(r.C),
+      ob_date: iso(r.E), emp_status: str(r.G), attrition_date: iso(r.F), pic: null, scheme_code: str(r.H), flags, note: '',
+    };
+    if (autoScheme(src.dc, src.ob_date, SIGNON_DEFAULT_SCHEMES)?.code !== src.scheme_code) autoDiff += 1;
+    MS.forEach(([d, e]) => {
+      const f = str(r[e]);
+      if ((f === 'Passed' || f === 'Failed') && r[d] instanceof Date && suggestFlag(src, iso(r[d]) as string) !== f) suggestDiff += 1;
+    });
+    return src;
+  });
+  const res = buildSignonPeriod(sources, paid, PERIOD, '2026-11-25', SIGNON_DEFAULT_SCHEMES);
+  const excelNov = rows.reduce((s, r) => s + (Number(r.AD) || 0), 0);
+  const sheetNov = sheetRows("Sign-on Bonus Payment _ Nov'26 Pay Period.xlsx", '112026').filter((r) => typeof r.B === 'number' && typeof r.J === 'number');
+  console.log(`\n#9 Sign-on – ${rows.length} người, ${res.lines.length} mốc vào kỳ, ${res.unassigned.length} chưa có scheme`);
+  console.log(`   scheme tự gán khác Excel: ${autoDiff} | cờ gợi ý khác Excel: ${suggestDiff} (admin sửa tay)`);
+  for (const [part, amt] of Object.entries(res.totals.byPart).sort()) console.log(`   ${part}: ${fmtVnd(amt)}`);
+  check('Sign-on cột AD (Nov)', res.totals.total, excelNov);
+  check('Số người được trả (sheet 112026)', res.totals.people, sheetNov.length);
+  check('TỔNG Sign-on', res.totals.total, 50_000_000);
+}
+
+for (const [name, fn] of [['referral', referral], ['signon', signon]] as const) {
   try {
     fn();
   } catch (e) {
