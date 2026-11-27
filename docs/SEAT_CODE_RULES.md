@@ -65,7 +65,11 @@ Sheet không dùng `INDIRECT`: mỗi ô của tab NhapLieu có danh sách riêng
 
 - Quy tắc: 5 cột phải là **tiền tố** của một nhánh đang dùng. Được dừng ở giữa (31/166 dòng mẫu dừng ở giữa). Không được bỏ trống cấp giữa rồi điền cấp sau (1 dòng mẫu lỗi kiểu này).
 - Đối chiếu 166 dòng NhapLieu: 134 đúng nhánh đầy đủ, 31 dừng ở giữa, 1 lỗi.
-- Danh mục ở bảng `seat_org_paths`. Admin thêm nhánh hoặc tắt (`active = false`) trên Supabase Table Editor; TA chỉ đọc.
+- Danh mục ở bảng `seat_org_paths`. TA chỉ đọc. Admin sửa ở màn hình Mã ghế → nút **Cây đơn vị** (`SeatOrgTreeAdmin.tsx`):
+  - Thêm / sửa nhánh: giá trị được chuẩn hóa (NFC, gộp khoảng trắng) trước khi lưu; Ban bắt buộc, không lỗ hổng, không trùng (CHECK + UNIQUE ở DB).
+  - Bấm vào một giá trị để đổi tên cho mọi nhánh bên dưới nó (1 lệnh update; nếu sẽ trùng nhánh có sẵn thì báo trước, DB cũng chặn).
+  - Tắt (`active = false`): TA không chọn được nữa. Xóa: bỏ hẳn nhánh. Nhánh từng được dùng thì nên Tắt.
+  - Đổi tên / tắt / xóa **không** sửa các dòng mã ghế đã nhập (dòng lưu chữ, không tham chiếu id). Dòng nháp cũ khi mở sửa sẽ hiện "(không có trong danh mục)" và phải chọn lại.
 - DB kiểm khi tạo dòng hoặc khi đổi 1 trong 5 cột (trigger `seat_requests_org_check`, lỗi `SEAT_ORG_INVALID:<cấp>` / `SEAT_ORG_HOLE:<cấp>`). Dòng cũ không bị khóa nếu danh mục đổi sau.
 - Form: đổi một cấp thì các cấp dưới tự xóa. Giá trị cũ không còn trong danh mục vẫn hiện, kèm chữ "(không có trong danh mục)".
 - Các cột từ Vùng trở đi không phụ thuộc cây (RawData để trống), giữ danh sách phẳng như cũ.

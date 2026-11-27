@@ -1,8 +1,9 @@
 // Quy trình 1 – Mã ghế. TA nhập dòng ở tài khoản riêng, gửi HRBP; HRSS (admin) xác nhận, cấp mã và xuất file.
 // Quy tắc: shared/seatCodeRules.ts, shared/seatOrgTree.ts (docs/SEAT_CODE_RULES.md). Dữ liệu: seatService (0038, 0041).
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BarChart3, CheckCircle2, Download, Hash, Pencil, Plus, RotateCcw, Send, Trash2 } from 'lucide-react';
+import { BarChart3, CheckCircle2, Download, Hash, Network, Pencil, Plus, RotateCcw, Send, Trash2 } from 'lucide-react';
 import { seatService, SeatValidationError, type SeatRequest, type SeatSummaryRow } from '../services/seatService.ts';
+import { SeatOrgTreeAdmin } from './SeatOrgTreeAdmin.tsx';
 import type { UserProfile } from '../services/authService.ts';
 import {
   SEAT_MAX_QTY,
@@ -229,6 +230,7 @@ export const SeatRequestsView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [monthFilter, setMonthFilter] = useState('');
   const [q, setQ] = useState('');
   const [summary, setSummary] = useState<SeatSummaryRow[] | null>(null);
+  const [orgAdmin, setOrgAdmin] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -356,6 +358,11 @@ export const SeatRequestsView: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {isAdmin && (
+            <button type="button" onClick={() => setOrgAdmin(true)} className={`${btn} border-slate-300 text-slate-700 hover:bg-slate-50`}>
+              <Network className="w-3.5 h-3.5" /> Cây đơn vị
+            </button>
+          )}
           {isAdmin && (
             <button type="button" onClick={setCounterValue} disabled={busy} className={`${btn} border-slate-300 text-slate-700 hover:bg-slate-50`}>
               <Hash className="w-3.5 h-3.5" /> Mã đã cấp gần nhất: {counter ?? '—'}
@@ -487,6 +494,7 @@ export const SeatRequestsView: React.FC<{ user: UserProfile }> = ({ user }) => {
           onSaved={(msg) => { setEditing(null); setNotice({ ok: true, text: msg }); void reload(); }}
         />
       )}
+      {orgAdmin && <SeatOrgTreeAdmin onClose={() => setOrgAdmin(false)} />}
       {busy && <div className="fixed bottom-4 right-4 bg-slate-800 text-white text-xs px-3 py-2 rounded-md shadow">Đang xử lý...</div>}
     </div>
   );
