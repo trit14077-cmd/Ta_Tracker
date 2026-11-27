@@ -4,9 +4,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pencil, Plus, Power, Trash2, X } from 'lucide-react';
 import { seatService, SeatValidationError, type SeatOrgRow } from '../services/seatService.ts';
-import { SEAT_ORG_LABEL, SEAT_ORG_LEVELS, seatOrgOptions, type SeatOrgLevel, type SeatOrgPath } from '../../../shared/seatOrgTree.ts';
+import { SEAT_ORG_LABEL, SEAT_ORG_LEVELS, SEAT_ORG_REGIONS, seatOrgOptions, type SeatOrgLevel, type SeatOrgPath } from '../../../shared/seatOrgTree.ts';
 
-const EMPTY: SeatOrgPath = { ban: '', don_vi: '', phong: '', doi: '', to_nhom: '' };
+type PathValues = Required<SeatOrgPath>;
+const EMPTY: PathValues = { ban: '', don_vi: '', phong: '', doi: '', to_nhom: '', vung: '' };
 const pathText = (p: SeatOrgPath) => SEAT_ORG_LEVELS.map((k) => p[k]).filter(Boolean).join(' > ');
 const sortKey = (p: SeatOrgPath) => SEAT_ORG_LEVELS.map((k) => p[k] || '\u0000');
 const byPath = (a: SeatOrgPath, b: SeatOrgPath) => {
@@ -28,8 +29,8 @@ const PathForm: React.FC<{
   onCancel: () => void;
   onSaved: (msg: string) => void;
 }> = ({ initial, all, onCancel, onSaved }) => {
-  const [values, setValues] = useState<SeatOrgPath>(() => (initial ? { ...EMPTY, ...pickPath(initial) } : { ...EMPTY }));
-  const [errors, setErrors] = useState<Partial<Record<SeatOrgLevel, string>>>({});
+  const [values, setValues] = useState<PathValues>(() => (initial ? { ...EMPTY, ...pickPath(initial) } : { ...EMPTY }));
+  const [errors, setErrors] = useState<Partial<Record<SeatOrgLevel | 'vung', string>>>({});
   const [failure, setFailure] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -42,7 +43,7 @@ const PathForm: React.FC<{
       await seatService.orgPathSave(initial ? initial.id : null, values, all);
       onSaved(initial ? 'Đã sửa nhánh.' : 'Đã thêm nhánh.');
     } catch (err) {
-      if (err instanceof SeatValidationError) setErrors(err.errors as Partial<Record<SeatOrgLevel, string>>);
+      if (err instanceof SeatValidationError) setErrors(err.errors as Partial<Record<SeatOrgLevel | 'vung', string>>);
       else setFailure((err as Error).message);
     } finally {
       setBusy(false);
@@ -52,7 +53,7 @@ const PathForm: React.FC<{
   return (
     <form onSubmit={save} className="border border-blue-200 bg-blue-50/40 rounded-lg p-3 space-y-2">
       <div className="text-xs font-semibold text-slate-700">{initial ? 'Sửa nhánh' : 'Thêm nhánh mới'}</div>
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
         {SEAT_ORG_LEVELS.map((k) => {
           const listId = `seat-org-dl-${k}`;
           return (
@@ -71,6 +72,21 @@ const PathForm: React.FC<{
             </label>
           );
         })}
+        <label className="block">
+          <span className="block text-[11px] text-slate-600 mb-0.5">Vùng (khóa theo nhánh)</span>
+          <select
+            className={`${inputCls} ${errors.vung ? 'border-red-400' : 'border-slate-300'}`}
+            value={values.vung}
+            onChange={(e) => setValues((s) => ({ ...s, vung: e.target.value }))}
+          >
+            <option value="">— Không khóa —</option>
+            {SEAT_ORG_REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+          {errors.vung && <span className="block text-[11px] text-red-600 mt-0.5">{errors.vung}</span>}
+        </label>
+      </div>
+      <div className="text-[11px] text-slate-500">
+        Vùng: khi TA chọn tới nhánh mà mọi nhánh con cùng một vùng, ô Vùng tự điền và không đổi được.
       </div>
       <div className="text-[11px] text-slate-500">
         Được dừng ở giữa (để trống các cấp sau), không được bỏ trống cấp giữa rồi điền cấp sau.
@@ -86,8 +102,8 @@ const PathForm: React.FC<{
   );
 };
 
-function pickPath(r: SeatOrgRow): SeatOrgPath {
-  return { ban: r.ban, don_vi: r.don_vi, phong: r.phong, doi: r.doi, to_nhom: r.to_nhom };
+function pickPath(r: SeatOrgRow): PathValues {
+  return { ban: r.ban, don_vi: r.don_vi, phong: r.phong, doi: r.doi, to_nhom: r.to_nhom, vung: r.vung ?? '' };
 }
 
 export const SeatOrgTreeAdmin: React.FC<{ onClose: () => void }> = ({ onClose }) => {
@@ -208,14 +224,15 @@ export const SeatOrgTreeAdmin: React.FC<{ onClose: () => void }> = ({ onClose })
               <thead className="bg-slate-50 text-slate-600">
                 <tr>
                   {SEAT_ORG_LEVELS.map((k) => <th key={k} className="px-2 py-2 text-left whitespace-nowrap">{SEAT_ORG_LABEL[k]}</th>)}
+                  <th className="px-2 py-2 text-left">Vùng</th>
                   <th className="px-2 py-2 text-left">Trạng thái</th>
                   <th className="px-2 py-2" />
                 </tr>
               </thead>
               <tbody>
-                {loading && <tr><td colSpan={7} className="px-3 py-6 text-center text-slate-500">Đang tải...</td></tr>}
+                {loading && <tr><td colSpan={8} className="px-3 py-6 text-center text-slate-500">Đang tải...</td></tr>}
                 {!loading && visible.length === 0 && (
-                  <tr><td colSpan={7} className="px-3 py-6 text-center text-slate-500">Không có nhánh nào.</td></tr>
+                  <tr><td colSpan={8} className="px-3 py-6 text-center text-slate-500">Không có nhánh nào.</td></tr>
                 )}
                 {!loading && visible.map((r, idx) => {
                   const prev = visible[idx - 1];
@@ -240,6 +257,7 @@ export const SeatOrgTreeAdmin: React.FC<{ onClose: () => void }> = ({ onClose })
                           </td>
                         );
                       })}
+                      <td className="px-2 py-1.5 whitespace-nowrap">{r.vung || <span className="text-slate-300">—</span>}</td>
                       <td className="px-2 py-1.5 whitespace-nowrap">
                         <span className={`px-1.5 py-0.5 rounded text-[11px] ${r.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
                           {r.active ? 'Đang dùng' : 'Đã tắt'}

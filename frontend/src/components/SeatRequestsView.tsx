@@ -1,9 +1,11 @@
 // Quy trình 1 – Mã ghế. TA nhập dòng ở tài khoản riêng, gửi HRBP; HRSS (admin) xác nhận, cấp mã và xuất file.
 // Quy tắc: shared/seatCodeRules.ts, shared/seatOrgTree.ts (docs/SEAT_CODE_RULES.md). Dữ liệu: seatService (0038, 0041).
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BarChart3, CheckCircle2, Download, Hash, Network, Pencil, Plus, RotateCcw, Send, Trash2 } from 'lucide-react';
+import { BarChart3, Briefcase, CheckCircle2, Download, Hash, Network, Pencil, Plus, RotateCcw, Send, Trash2 } from 'lucide-react';
 import { seatService, SeatValidationError, type SeatRequest, type SeatSummaryRow } from '../services/seatService.ts';
 import { SeatOrgTreeAdmin } from './SeatOrgTreeAdmin.tsx';
+import { SeatPositionAdmin } from './SeatPositionAdmin.tsx';
+import { SearchableSelect } from './SearchableSelect.tsx';
 import type { UserProfile } from '../services/authService.ts';
 import {
   SEAT_MAX_QTY,
@@ -18,7 +20,8 @@ import {
   type SeatInputKey,
   type SeatStatus,
 } from '../../../shared/seatCodeRules.ts';
-import { SEAT_ORG_LEVELS, seatOrgOptions, seatOrgSet, type SeatOrgLevel, type SeatOrgPath } from '../../../shared/seatOrgTree.ts';
+import { SEAT_ORG_LEVELS, seatOrgOptions, seatOrgSet, seatVungRequired, type SeatOrgLevel, type SeatOrgPath } from '../../../shared/seatOrgTree.ts';
+import { seatPositionOptions, seatRankGroup, seatRankingOptions, type SeatPositionPair } from '../../../shared/seatPositions.ts';
 
 const STATUS_CLS: Record<SeatStatus, string> = {
   nhap: 'bg-slate-100 text-slate-700',
@@ -141,10 +144,35 @@ const SeatForm: React.FC<{ initial: SeatRequest | null; onClose: () => void; onS
     seatService.orgPaths().then((p) => { if (alive && p.length) setOrgPaths(p); }).catch(() => undefined);
     return () => { alive = false; };
   }, []);
+  // 0043: danh mục Vị trí AP → Ranking. null = chưa tải / lỗi → nhập tay như cũ (DB vẫn kiểm).
+  const [positions, setPositions] = useState<SeatPositionPair[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    seatService.positions().then((p) => { if (alive && p.length) setPositions(p); }).catch(() => undefined);
+    return () => { alive = false; };
+  }, []);
+  const positionList = useMemo(() => (positions ? seatPositionOptions(positions) : []), [positions]);
+  const rankingList = positions ? seatRankingOptions(positions, values.vi_tri_ap) : null;
 
-  const set = (k: SeatInputKey, v: string) => setValues((s) => (isOrgLevel(k) ? seatOrgSet(s, k, v) : { ...s, [k]: v }));
-  // Như DB: chỉ kiểm nhánh khi thêm mới hoặc khi đổi 1 trong 5 cột (dòng cũ không bị khóa nếu danh mục đổi sau).
-  const orgChanged = !initial || SEAT_ORG_LEVELS.some((k) => normText(values[k]) !== normText(initial[k]));
+  // Đổi 1 cấp tổ chức: xóa cấp dưới; nếu nhánh mới khóa vùng (0042) thì điền luôn Vùng.
+  const set = (k: SeatInputKey, v: string) => setValues((s) => {
+    // Chọn vị trí: ranking cũ không thuộc vị trí mới thì bỏ; vị trí chỉ có 1 ranking thì điền luôn.
+    if (k === 'vi_tri_ap' && positions) {
+      const ranks = seatRankingOptions(positions, v);
+      const ranking = ranks.length === 1 ? ranks[0] : ranks.includes(s.ranking_ap) ? s.ranking_ap : '';
+      return { ...s, vi_tri_ap: v, ranking_ap: ranking, nhom_chuc_danh: seatRankGroup(ranking) || s.nhom_chuc_danh };
+    }
+    // Nhóm chức danh theo chữ số của Ranking AP (6B → Rank 6).
+    if (k === 'ranking_ap') return { ...s, ranking_ap: v, nhom_chuc_danh: seatRankGroup(v) || s.nhom_chuc_danh };
+    if (!isOrgLevel(k)) return { ...s, [k]: v };
+    const next = seatOrgSet(s, k, v);
+    const locked = orgPaths ? seatVungRequired(orgPaths, next) : null;
+    return locked ? { ...next, vung: locked } : next;
+  });
+  const vungLocked = orgPaths ? seatVungRequired(orgPaths, values) : null;
+  // Như DB: chỉ kiểm nhánh/vùng khi thêm mới hoặc khi đổi 1 trong 5 cột hoặc Vùng (dòng cũ không bị khóa nếu danh mục đổi sau).
+  const orgChanged = !initial || [...SEAT_ORG_LEVELS, 'vung' as const].some((k) => normText(values[k]) !== normText(initial[k]));
+  const posChanged = !initial || (['vi_tri_ap', 'ranking_ap'] as const).some((k) => normText(values[k]) !== normText(initial[k]));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,7 +180,12 @@ const SeatForm: React.FC<{ initial: SeatRequest | null; onClose: () => void; onS
     setFormError('');
     setErrors({});
     try {
-      await seatService.save(initial ? initial.id : null, values, orgChanged ? orgPaths ?? undefined : undefined);
+      await seatService.save(
+        initial ? initial.id : null,
+        values,
+        orgChanged ? orgPaths ?? undefined : undefined,
+        posChanged ? positions ?? undefined : undefined,
+      );
       onSaved(initial ? 'Đã lưu dòng mã ghế.' : 'Đã thêm dòng mã ghế (nháp). Gửi HRBP khi đã đủ.');
     } catch (err) {
       if (err instanceof SeatValidationError) {
@@ -179,6 +212,28 @@ const SeatForm: React.FC<{ initial: SeatRequest | null; onClose: () => void; onS
               <span className="font-medium">{f.label}{f.required && <span className="text-red-600"> *</span>}</span>
               {orgPaths && isOrgLevel(f.key) ? (
                 <OrgSelect level={f.key} paths={orgPaths} values={values} onChange={(v) => set(f.key, v)} />
+              ) : f.key === 'vung' && vungLocked ? (
+                <>
+                  <select className={inputCls} value={values.vung} onChange={(e) => set('vung', e.target.value)}>
+                    <option value={vungLocked}>{vungLocked}</option>
+                    {values.vung && values.vung !== vungLocked && <option value={values.vung}>{values.vung} (sai vùng)</option>}
+                  </select>
+                  <span className="block text-[11px] text-slate-500 mt-0.5">Theo Đội đã chọn.</span>
+                </>
+              ) : f.key === 'vi_tri_ap' && positions ? (
+                <SearchableSelect
+                  value={values.vi_tri_ap}
+                  options={values.vi_tri_ap && !positionList.includes(values.vi_tri_ap) ? [values.vi_tri_ap, ...positionList] : positionList}
+                  onChange={(v) => set('vi_tri_ap', v)}
+                  placeholder="— Chọn vị trí —"
+                  error={Boolean(errors.vi_tri_ap)}
+                />
+              ) : f.key === 'ranking_ap' && rankingList ? (
+                <select className={`${inputCls} disabled:bg-slate-50 disabled:text-slate-400`} value={values.ranking_ap} disabled={!values.vi_tri_ap} onChange={(e) => set('ranking_ap', e.target.value)}>
+                  <option value="">{values.vi_tri_ap ? '— Chọn —' : '— Chọn vị trí trước —'}</option>
+                  {values.ranking_ap && !rankingList.includes(values.ranking_ap) && <option value={values.ranking_ap}>{values.ranking_ap} (không thuộc vị trí)</option>}
+                  {rankingList.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
               ) : f.select ? (
                 <select className={inputCls} value={values[f.key]} onChange={(e) => set(f.key, e.target.value)}>
                   <option value="">{f.optionalSelect ? '— Không —' : '— Chọn —'}</option>
@@ -231,6 +286,7 @@ export const SeatRequestsView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [q, setQ] = useState('');
   const [summary, setSummary] = useState<SeatSummaryRow[] | null>(null);
   const [orgAdmin, setOrgAdmin] = useState(false);
+  const [posAdmin, setPosAdmin] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -361,6 +417,11 @@ export const SeatRequestsView: React.FC<{ user: UserProfile }> = ({ user }) => {
           {isAdmin && (
             <button type="button" onClick={() => setOrgAdmin(true)} className={`${btn} border-slate-300 text-slate-700 hover:bg-slate-50`}>
               <Network className="w-3.5 h-3.5" /> Cây đơn vị
+            </button>
+          )}
+          {isAdmin && (
+            <button type="button" onClick={() => setPosAdmin(true)} className={`${btn} border-slate-300 text-slate-700 hover:bg-slate-50`}>
+              <Briefcase className="w-3.5 h-3.5" /> Vị trí – Ranking
             </button>
           )}
           {isAdmin && (
@@ -495,6 +556,7 @@ export const SeatRequestsView: React.FC<{ user: UserProfile }> = ({ user }) => {
         />
       )}
       {orgAdmin && <SeatOrgTreeAdmin onClose={() => setOrgAdmin(false)} />}
+      {posAdmin && <SeatPositionAdmin onClose={() => setPosAdmin(false)} />}
       {busy && <div className="fixed bottom-4 right-4 bg-slate-800 text-white text-xs px-3 py-2 rounded-md shadow">Đang xử lý...</div>}
     </div>
   );

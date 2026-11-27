@@ -7,13 +7,16 @@ import {
   SEAT_ORG_MSG_DUP,
   SEAT_ORG_MSG_HOLE,
   parseSeatOrgDbError,
+  parseSeatVungDbError,
   seatOrgClean,
   seatOrgError,
   seatOrgPathError,
   seatOrgRenamePlan,
+  seatVungError,
   type SeatOrgLevel,
   type SeatOrgPath,
 } from '../../../shared/seatOrgTree.ts';
+import { parseSeatPositionDbError, seatPositionError, type SeatPositionPair } from '../../../shared/seatPositions.ts';
 import {
   SEAT_EXPORT_HEADERS,
   toSeatExportRow,
@@ -53,6 +56,12 @@ export interface SeatOrgRow extends SeatOrgPath {
   created_at: string;
 }
 
+/** Một cặp vị trí – ranking (bảng seat_positions, 0043) – màn hình admin thấy cả cặp đã tắt. */
+export interface SeatPositionRow extends SeatPositionPair {
+  id: number;
+  active: boolean;
+}
+
 export class SeatValidationError extends Error {
   constructor(public errors: Partial<Record<SeatInputKey, string>>) {
     super('Dữ liệu chưa đạt quy tắc nhập.');
@@ -73,7 +82,8 @@ const SEAT_ERRORS: [string, string][] = [
 
 function seatError(e: { message?: string; code?: string } | null, fallback: string): Error {
   const msg = e?.message ?? '';
-  const org = parseSeatOrgDbError(msg);  // 0041: Ban → Đơn vị → Phòng → Đội → Tổ sai nhánh
+  // 0041 sai nhánh, 0042 sai vùng theo Đội, 0043 sai vị trí / ranking
+  const org = parseSeatOrgDbError(msg) ?? parseSeatVungDbError(msg) ?? parseSeatPositionDbError(msg);
   if (org) return new SeatValidationError({ [org.key]: org.msg });
   const hit = SEAT_ERRORS.find(([code]) => msg.includes(code));
   if (hit) return new Error(hit[1]);
@@ -87,6 +97,13 @@ function orgTreeError(e: { message?: string; code?: string }, fallback: string):
   if (e.code === '23505') return new Error(SEAT_ORG_MSG_DUP);
   if (e.code === '23514') return new Error(SEAT_ORG_MSG_HOLE);
   if (e.code === '42501') return new Error('Chỉ admin sửa được cây đơn vị.');
+  return new Error(fallback);
+}
+// Lỗi khi admin ghi bảng seat_positions.
+function positionError(e: { message?: string; code?: string }, fallback: string): Error {
+  if (e.code === '23505') return new Error('Vị trí này đã có ranking đó (có thể đang tắt).');
+  if (e.code === '23514') return new Error('Ranking phải dạng 2A–6C, tên vị trí không được trống.');
+  if (e.code === '42501') return new Error('Chỉ admin sửa được danh mục vị trí.');
   return new Error(fallback);
 }
 // RLS không báo lỗi khi update/delete bị chặn, chỉ trả 0 dòng.
@@ -108,14 +125,14 @@ export const seatService = {
 
   /** Danh mục Ban → Đơn vị → Phòng → Đội → Tổ đang dùng (bảng seat_org_paths, migration 0041). */
   async orgPaths(): Promise<SeatOrgPath[]> {
-    const { data, error } = await supabase.from('seat_org_paths').select('ban, don_vi, phong, doi, to_nhom').eq('active', true).limit(5000);
+    const { data, error } = await supabase.from('seat_org_paths').select('ban, don_vi, phong, doi, to_nhom, vung').eq('active', true).limit(5000);
     if (error) throw seatError(error, 'Không tải được danh mục Ban/Đơn vị/Phòng/Đội/Tổ.');
     return (data ?? []) as SeatOrgPath[];
   },
 
   /** Admin: toàn bộ cây, cả nhánh đã tắt. */
   async orgPathsAll(): Promise<SeatOrgRow[]> {
-    const { data, error } = await supabase.from('seat_org_paths').select('id, ban, don_vi, phong, doi, to_nhom, active, created_at').limit(5000);
+    const { data, error } = await supabase.from('seat_org_paths').select('id, ban, don_vi, phong, doi, to_nhom, vung, active, created_at').limit(5000);
     if (error) throw orgTreeError(error, 'Không tải được cây đơn vị.');
     return (data ?? []) as SeatOrgRow[];
   },
@@ -124,7 +141,7 @@ export const seatService = {
   async orgPathSave(id: number | null, values: Partial<SeatOrgPath>, existing: readonly SeatOrgRow[]): Promise<void> {
     const err = seatOrgPathError(values, existing, id);
     if (err) throw new SeatValidationError({ [err.key]: err.msg });
-    const row = seatOrgClean(values);
+    const row = { ...seatOrgClean(values), vung: String(values.vung ?? '').normalize('NFC').trim() };
     if (id === null) {
       const { error } = await supabase.from('seat_org_paths').insert(row);
       if (error) throw orgTreeError(error, 'Không thêm được nhánh.');
@@ -163,12 +180,69 @@ export const seatService = {
     return orgTreeCount(data);
   },
 
+  /** Danh mục Vị trí theo AP → Ranking đang dùng (bảng seat_positions, migration 0043). */
+  async positions(): Promise<SeatPositionPair[]> {
+    const { data, error } = await supabase.from('seat_positions').select('vi_tri, ranking').eq('active', true).limit(5000);
+    if (error) throw seatError(error, 'Không tải được danh mục Vị trí – Ranking.');
+    return (data ?? []) as SeatPositionPair[];
+  },
+
+  /** Admin: toàn bộ cặp vị trí – ranking, cả cặp đã tắt. */
+  async positionsAll(): Promise<SeatPositionRow[]> {
+    const { data, error } = await supabase.from('seat_positions').select('id, vi_tri, ranking, active').limit(5000);
+    if (error) throw orgTreeError(error, 'Không tải được danh mục Vị trí – Ranking.');
+    return (data ?? []) as SeatPositionRow[];
+  },
+
+  /** Admin: thêm 1 vị trí với các ranking (bỏ qua cặp đã có). Trả về số cặp thêm mới. */
+  async positionAdd(viTri: string, rankings: string[], existing: readonly SeatPositionRow[]): Promise<number> {
+    const name = viTri.normalize('NFC').replace(/\s+/g, ' ').trim();
+    if (!name) throw new SeatValidationError({ vi_tri_ap: 'Bắt buộc nhập tên vị trí.' });
+    if (!rankings.length) throw new SeatValidationError({ ranking_ap: 'Chọn ít nhất 1 ranking.' });
+    // Tên chỉ khác hoa/thường với vị trí có sẵn: dùng đúng tên có sẵn, tránh tạo vị trí trùng.
+    const same = existing.find((p) => p.vi_tri.toLowerCase() === name.toLowerCase());
+    const target = same ? same.vi_tri : name;
+    const rows = rankings.filter((r) => !existing.some((p) => p.vi_tri === target && p.ranking === r)).map((ranking) => ({ vi_tri: target, ranking }));
+    if (!rows.length) throw new Error('Các ranking này đã có cho vị trí này.');
+    const { error } = await supabase.from('seat_positions').insert(rows);
+    if (error) throw positionError(error, 'Không thêm được vị trí.');
+    return rows.length;
+  },
+
+  async positionSetActive(ids: number[], active: boolean): Promise<number> {
+    const { data, error } = await supabase.from('seat_positions').update({ active }).in('id', ids).select('id');
+    if (error) throw positionError(error, 'Không đổi được trạng thái.');
+    return orgTreeCount(data);
+  },
+
+  async positionRemove(ids: number[]): Promise<number> {
+    const { data, error } = await supabase.from('seat_positions').delete().in('id', ids).select('id');
+    if (error) throw positionError(error, 'Không xóa được.');
+    return orgTreeCount(data);
+  },
+
+  /** Admin: đổi tên vị trí (mọi ranking của vị trí đó). Dòng mã ghế đã nhập giữ tên cũ. */
+  async positionRename(from: string, to: string): Promise<number> {
+    const name = to.normalize('NFC').replace(/\s+/g, ' ').trim();
+    if (!name) throw new Error('Tên mới không được để trống.');
+    const { data, error } = await supabase.from('seat_positions').update({ vi_tri: name }).eq('vi_tri', from).select('id');
+    if (error) throw positionError(error, 'Không đổi được tên vị trí.');
+    return orgTreeCount(data);
+  },
+
   /** Tạo mới (id = null) hoặc sửa. Dòng đã gửi/đã cấp: RLS và trigger chặn, báo lỗi rõ ràng.
-   *  paths: danh mục đã tải -> kiểm nhánh ngay trên trình duyệt (DB vẫn kiểm lại). */
-  async save(id: number | null, input: Record<string, unknown>, paths?: readonly SeatOrgPath[]): Promise<void> {
+   *  paths / positions: danh mục đã tải -> kiểm ngay trên trình duyệt (DB vẫn kiểm lại). */
+  async save(
+    id: number | null,
+    input: Record<string, unknown>,
+    paths?: readonly SeatOrgPath[],
+    positions?: readonly SeatPositionPair[],
+  ): Promise<void> {
     const v = validateSeatRequest(input as Partial<Record<SeatInputKey, unknown>>);
-    const org = paths?.length ? seatOrgError(paths, v.clean) : null;
+    const org = paths?.length ? seatOrgError(paths, v.clean) ?? seatVungError(paths, v.clean) : null;
     if (org && !v.errors[org.key]) v.errors[org.key] = org.msg;
+    const pos = positions?.length ? seatPositionError(positions, v.clean) : null;
+    if (pos && !v.errors[pos.key]) v.errors[pos.key] = pos.msg;
     if (Object.keys(v.errors).length) throw new SeatValidationError(v.errors);
     const row = { ...v.clean, so_luong: Number(v.clean.so_luong) };
     if (id === null) {
