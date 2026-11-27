@@ -145,6 +145,10 @@ export const CandidateFormView: React.FC<CandidateFormViewProps> = ({
     { candidate_code: string; full_name: string; pic: string; position?: string }[]
   >([]);
   const [emailCheckFailed, setEmailCheckFailed] = useState<boolean>(false);
+  const [empIdDuplicates, setEmpIdDuplicates] = useState<
+    { candidate_code: string; full_name: string; pic: string; position?: string }[]
+  >([]);
+  const [empIdCheckFailed, setEmpIdCheckFailed] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [bannerMessage, setBannerMessage] = useState<{
     type: 'success' | 'error';
@@ -192,6 +196,8 @@ export const CandidateFormView: React.FC<CandidateFormViewProps> = ({
     setFieldErrors({});
     setFieldNotices({});
     setPhoneDuplicates([]);
+    setEmpIdDuplicates([]);
+    setEmpIdCheckFailed(false);
     setBannerMessage(null);
   }, [editingCandidate]);
 
@@ -344,6 +350,23 @@ export const CandidateFormView: React.FC<CandidateFormViewProps> = ({
       setEmailCheckFailed(res.checkFailed);
     } catch {
       setEmailCheckFailed(true);
+    }
+  };
+
+  // Task #14: kiểm trùng Mã nhân viên khi rời ô Emp_ID (cảnh báo, vẫn cho lưu).
+  const handleEmpIdBlur = async () => {
+    const empId = (values.emp_id || '').trim();
+    if (!empId) {
+      setEmpIdDuplicates([]);
+      setEmpIdCheckFailed(false);
+      return;
+    }
+    try {
+      const res = await candidateService.checkEmpIdDuplicate(empId, editingCandidate?.id);
+      setEmpIdDuplicates(res.duplicates || []);
+      setEmpIdCheckFailed(res.checkFailed);
+    } catch {
+      setEmpIdCheckFailed(true);
     }
   };
 
@@ -815,6 +838,32 @@ export const CandidateFormView: React.FC<CandidateFormViewProps> = ({
         </div>
       )}
 
+      {empIdCheckFailed && (
+        <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2.5 text-xs text-amber-900">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <p className="font-semibold">Không kiểm tra được trùng mã nhân viên — vui lòng kiểm tra thủ công trước khi lưu.</p>
+        </div>
+      )}
+
+      {empIdDuplicates.length > 0 && (
+        <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2.5 text-xs text-amber-900">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold">
+              Cảnh báo trùng mã nhân viên ({values.emp_id}) — Hệ thống vẫn cho phép lưu nhưng vui lòng kiểm tra:
+            </p>
+            <ul className="mt-1 space-y-0.5 list-disc list-inside text-amber-800">
+              {empIdDuplicates.map((d, i) => (
+                <li key={`${d.candidate_code}-${i}`}>
+                  Mã UV: <span className="font-mono-tabular font-semibold">{d.candidate_code}</span> —{' '}
+                  {d.full_name} (PIC: {d.pic})
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
       <datalist id="suggest-pending_at">
         {(dropdowns.lists.pending_at || []).filter((o) => o.active).map((o) => (
           <option key={o.value} value={o.value} />
@@ -1217,6 +1266,8 @@ export const CandidateFormView: React.FC<CandidateFormViewProps> = ({
                               ? handlePhoneBlur
                               : field.key === 'email'
                               ? handleEmailBlur
+                              : field.key === 'emp_id'
+                              ? handleEmpIdBlur
                               : field.key === 'birth' || field.type === 'date'
                               ? () => handleFormatBlur(field.key)
                               : undefined

@@ -7,6 +7,8 @@ import { POSITION_EN } from '../../shared/positionCatalog.ts';
 
 export const NEW_EN: Record<string, string> = {
   'Chọn ngày trên lịch': 'Pick a date on the calendar',
+  // ---- kiểm trùng mã nhân viên (CandidateFormView, task #14)
+  'Không kiểm tra được trùng mã nhân viên — vui lòng kiểm tra thủ công trước khi lưu.': 'Could not check for a duplicate employee ID — please check manually before saving.',
   // ---- Soạn email theo mẫu (EmailComposerModal)
   'Cần gửi bây giờ': 'Send now',
   'Chưa đến lúc / đã qua': 'Not yet / already passed',
