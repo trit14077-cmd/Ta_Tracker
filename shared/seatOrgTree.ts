@@ -6,8 +6,10 @@
  */
 export const SEAT_ORG_LEVELS = ['ban', 'don_vi', 'phong', 'doi', 'to_nhom'] as const;
 export type SeatOrgLevel = (typeof SEAT_ORG_LEVELS)[number];
-export type SeatOrgPath = Record<SeatOrgLevel, string>;
-export type SeatOrgValues = Partial<Record<SeatOrgLevel, unknown>>;
+/** vung (0042): Phòng/Vùng/Miền của nhánh; '' = không khóa vùng. */
+export type SeatOrgPath = Record<SeatOrgLevel, string> & { vung?: string };
+export type SeatOrgValues = Partial<Record<SeatOrgLevel | 'vung', unknown>>;
+export const SEAT_ORG_REGIONS = ['Miền Bắc', 'Miền Nam', 'Miền Trung'] as const;
 
 const norm = (v: unknown) => String(v ?? '').normalize('NFC').replace(/\s+/g, ' ').trim();
 
@@ -23,6 +25,8 @@ export const SEAT_ORG_MSG_INVALID = 'Không có trong danh mục của cấp tr�
 export const SEAT_ORG_MSG_HOLE = 'Chọn cấp này trước khi chọn các cấp sau.';
 export const SEAT_ORG_MSG_BAN_REQUIRED = 'Bắt buộc nhập Ban.';
 export const SEAT_ORG_MSG_DUP = 'Nhánh này đã có trong danh mục.';
+export const SEAT_VUNG_MSG_LOCKED = 'Vùng phải đúng theo Đội đã chọn.';
+export const SEAT_VUNG_MSG_INVALID = 'Vùng chỉ được là Miền Bắc, Miền Nam, Miền Trung hoặc để trống.';
 
 const matches = (p: SeatOrgPath, v: SeatOrgPath, upto: number) => SEAT_ORG_LEVELS.slice(0, upto).every((k) => p[k] === v[k]);
 
@@ -65,6 +69,29 @@ export function seatOrgError(paths: readonly SeatOrgPath[], values: SeatOrgValue
   return null;
 }
 
+/**
+ * Vùng bắt buộc theo phần tổ chức đã chọn (bản TS của app.seat_vung_required, 0042): các nhánh đang dùng khớp tiền tố
+ * mà cùng 1 vùng khác rỗng -> vùng đó. null = chọn tự do (khối văn phòng, nhánh chưa điền vùng, Đội ở nhiều vùng).
+ */
+export function seatVungRequired(paths: readonly SeatOrgPath[], values: SeatOrgValues): string | null {
+  const v = clean(values);
+  if (!v.ban) return null;
+  const hit = paths.filter((p) => SEAT_ORG_LEVELS.every((k) => !v[k] || p[k] === v[k]));
+  const regions = new Set(hit.map((p) => norm(p.vung)));
+  return hit.length && regions.size === 1 && !regions.has('') ? [...regions][0] : null;
+}
+
+/** Vùng khác vùng bắt buộc (giống app.seat_vung_error). */
+export function seatVungError(paths: readonly SeatOrgPath[], values: SeatOrgValues): { key: 'vung'; msg: string } | null {
+  const r = seatVungRequired(paths, values);
+  return r && norm(values.vung) !== r ? { key: 'vung', msg: SEAT_VUNG_MSG_LOCKED } : null;
+}
+
+/** Mã lỗi DB 'SEAT_VUNG_LOCKED' → câu báo ở ô Vùng. */
+export function parseSeatVungDbError(message: string): { key: 'vung'; msg: string } | null {
+  return message.includes('SEAT_VUNG_LOCKED') ? { key: 'vung', msg: SEAT_VUNG_MSG_LOCKED } : null;
+}
+
 /** Mã lỗi DB ('SEAT_ORG_INVALID:doi', 'SEAT_ORG_HOLE:phong') → cấp + câu báo. */
 export function parseSeatOrgDbError(message: string): { key: SeatOrgLevel; msg: string } | null {
   const m = /SEAT_ORG_(INVALID|HOLE):([a-z_]+)/.exec(message);
@@ -80,11 +107,13 @@ export function seatOrgPathError(
   values: SeatOrgValues,
   existing: readonly (SeatOrgPath & { id?: number })[] = [],
   selfId?: number | null,
-): { key: SeatOrgLevel; msg: string } | null {
+): { key: SeatOrgLevel | 'vung'; msg: string } | null {
   const v = clean(values);
   if (!v.ban) return { key: 'ban', msg: SEAT_ORG_MSG_BAN_REQUIRED };
   const hole = holeError(v);
   if (hole) return hole;
+  const vung = norm(values.vung);
+  if (vung && !(SEAT_ORG_REGIONS as readonly string[]).includes(vung)) return { key: 'vung', msg: SEAT_VUNG_MSG_INVALID };
   const dup = existing.some((p) => p.id !== selfId && SEAT_ORG_LEVELS.every((k) => norm(p[k]) === v[k]));
   if (dup) return { key: [...SEAT_ORG_LEVELS].reverse().find((k) => v[k]) ?? 'ban', msg: SEAT_ORG_MSG_DUP };
   return null;

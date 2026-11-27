@@ -72,7 +72,19 @@ Sheet không dùng `INDIRECT`: mỗi ô của tab NhapLieu có danh sách riêng
   - Đổi tên / tắt / xóa **không** sửa các dòng mã ghế đã nhập (dòng lưu chữ, không tham chiếu id). Dòng nháp cũ khi mở sửa sẽ hiện "(không có trong danh mục)" và phải chọn lại.
 - DB kiểm khi tạo dòng hoặc khi đổi 1 trong 5 cột (trigger `seat_requests_org_check`, lỗi `SEAT_ORG_INVALID:<cấp>` / `SEAT_ORG_HOLE:<cấp>`). Dòng cũ không bị khóa nếu danh mục đổi sau.
 - Form: đổi một cấp thì các cấp dưới tự xóa. Giá trị cũ không còn trong danh mục vẫn hiện, kèm chữ "(không có trong danh mục)".
-- Các cột từ Vùng trở đi không phụ thuộc cây (RawData để trống), giữ danh sách phẳng như cũ.
+- **Vùng khóa theo Đội (0042, PO chốt 27/11/2026: khóa cứng).** Sheet không có dropdown này, nhưng 20/23 Đội trong 166 dòng mẫu chỉ có 1 vùng.
+  - Cột `seat_org_paths.vung` ('' = không khóa). Điền sẵn 28 Đội: 10 Miền Bắc, 12 Miền Nam, 6 Miền Trung (Kho Vinh – Nghệ An và TTPP Nghệ An = Miền Trung theo PO).
+  - Chưa điền (chọn tự do): TTPP Bình Thuận, TTPP Suối Mơ. Khối văn phòng (không có Đội) chọn tự do vì vùng theo người.
+  - Quy tắc (`app.seat_vung_required` / `seatVungRequired`): các nhánh đang dùng khớp phần đã chọn mà cùng 1 vùng khác rỗng thì Vùng phải đúng vùng đó. Sai: lỗi `SEAT_VUNG_LOCKED`.
+  - Form tự điền Vùng khi chọn Đội. Admin sửa vùng của nhánh ở màn hình Cây đơn vị.
+- **Ranking theo Vị trí (0043, PO chốt 27/11/2026: mỗi vị trí có ranking riêng, có thể nhiều ranking).**
+  - Bảng `seat_positions`, mỗi dòng 1 cặp (vị trí, ranking). Nạp sẵn từ 166 dòng NhapLieu: 56 vị trí, 64 cặp, 8 vị trí có 2 ranking.
+    Tên chỉ khác hoa/thường được gộp, ưu tiên cách viết trong danh mục vị trí chuẩn (`shared/positionCatalog.ts`).
+  - Khóa cứng: Vị trí theo AP phải chọn trong danh sách (vị trí mới thì admin thêm ở nút **Vị trí – Ranking**), Ranking AP phải thuộc vị trí.
+    Lỗi `SEAT_POS_UNKNOWN` / `SEAT_POS_RANKING` (trigger `seat_requests_position_check`, kiểm khi tạo mới hoặc đổi Vị trí AP / Ranking AP).
+  - Form: chọn vị trí thì Ranking AP chỉ hiện ranking của vị trí, có 1 thì tự điền; Nhóm chức danh tự điền theo chữ số ranking (6B → Rank 6).
+  - Tham khảo: bản ẩn danh Master (9.829 hồ sơ) cũng có 1 vị trí nhiều rank (45/69 vị trí), nhưng lẫn dữ liệu nhập sai nên không dùng để nạp.
+- Các cột khác (Ranking Offer, Vị trí Offer…) giữ như cũ.
 
 ## 3. Cấp mã ghế
 

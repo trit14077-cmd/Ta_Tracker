@@ -18,6 +18,8 @@ begin
     (a, 'seat_admin', 'admin', null, true), (t1, 'seat_t1', 'pic', 'SEAT-P1', true), (t2, 'seat_t2', 'pic', 'SEAT-P2', true);
   update public.seat_code_counter set last_issued = 25597257 where id = 1;
   delete from public.audit_logs where action like 'SEAT_%';
+  -- 0043: vị trí dùng trong fixture (danh mục thật không có các tên rút gọn này)
+  insert into public.seat_positions (vi_tri, ranking) values ('NV', '6A'), ('Nhân viên kho', '6A'), ('Trưởng ca', '5B'), ('Lái xe nâng', '6B');
 
   -- ---------- TA1 tạo 2 dòng, TA2 tạo 1 dòng ----------
   execute 'set local role authenticated';
@@ -159,7 +161,7 @@ begin
     assert false, 'bỏ trống cấp giữa phải bị chặn';
   exception when others then assert sqlerrm = 'SEAT_ORG_HOLE:don_vi', 'lỗ hổng: ' || sqlerrm; c := c + 1;
   end;
-  update public.seat_requests set to_nhom = 'Pick Pack', doi = 'Kho Cần Thơ' where id = s2;  -- đổi sang nhánh khác hợp lệ
+  update public.seat_requests set to_nhom = 'Pick Pack', doi = 'Kho Cần Thơ', vung = 'Miền Nam' where id = s2;  -- đổi sang nhánh khác hợp lệ (0042: Cần Thơ = Miền Nam)
   c := c + 1;
   begin
     update public.seat_requests set to_nhom = 'Không có tổ này' where id = s2;
@@ -168,6 +170,64 @@ begin
   end;
   update public.seat_requests set note = 'không đổi tổ chức' where id = s2;  -- không đụng 5 cột: không kiểm lại
   c := c + 1;
+  -- ---------- 0042: Vùng khóa theo Đội ----------
+  begin
+    insert into public.seat_requests (ban, don_vi, phong, doi, vung, nhom_chuc_danh, ranking_ap, vi_tri_ap, so_luong, quan_ly_truc_tiep)
+    values ('Chuỗi Cung Ứng', 'Ambient Logistics', 'Kho Ambient', 'Kho Bắc Ninh', 'Miền Nam', 'Rank 6', '6A', 'NV', 1, 'QL');
+    assert false, 'Kho Bắc Ninh + Miền Nam phải bị chặn';
+  exception when others then assert sqlerrm = 'SEAT_VUNG_LOCKED', 'vùng sai: ' || sqlerrm; c := c + 1;
+  end;
+  begin
+    insert into public.seat_requests (ban, don_vi, phong, doi, vung, nhom_chuc_danh, ranking_ap, vi_tri_ap, so_luong, quan_ly_truc_tiep)
+    values ('Chuỗi Cung Ứng', 'Ambient – MCH Logistics', 'Kho Ambient MCH', 'Trung Tâm Phân Phối Nghệ An', 'Miền Bắc', 'Rank 6', '6A', 'NV', 1, 'QL');
+    assert false, 'Nghệ An phải là Miền Trung';
+  exception when others then assert sqlerrm = 'SEAT_VUNG_LOCKED', 'Nghệ An: ' || sqlerrm; c := c + 1;
+  end;
+  insert into public.seat_requests (ban, don_vi, phong, doi, vung, nhom_chuc_danh, ranking_ap, vi_tri_ap, so_luong, quan_ly_truc_tiep)
+  values ('Chuỗi Cung Ứng', 'Ambient – MCH Logistics', 'Kho Ambient MCH', 'Trung Tâm Phân Phối Nghệ An', 'Miền Trung', 'Rank 6', '6A', 'NV', 1, 'QL');
+  c := c + 1;  -- đúng vùng
+  insert into public.seat_requests (ban, don_vi, phong, doi, vung, nhom_chuc_danh, ranking_ap, vi_tri_ap, so_luong, quan_ly_truc_tiep)
+  values ('Chuỗi Cung Ứng', 'Ambient – MCH Logistics', 'Kho Ambient MCH', 'Trung Tâm Phân Phối Suối Mơ', 'Miền Nam', 'Rank 6', '6A', 'NV', 1, 'QL');
+  c := c + 1;  -- Đội chưa có vùng: chọn tự do
+  insert into public.seat_requests (ban, don_vi, vung, nhom_chuc_danh, ranking_ap, vi_tri_ap, so_luong, quan_ly_truc_tiep)
+  values ('Chuỗi Cung Ứng', 'Ambient Logistics', 'Miền Trung', 'Rank 6', '6A', 'NV', 1, 'QL');
+  c := c + 1;  -- dừng ở Đơn vị có nhiều vùng: chọn tự do
+  insert into public.seat_requests (ban, don_vi, vung, nhom_chuc_danh, ranking_ap, vi_tri_ap, so_luong, quan_ly_truc_tiep)
+  values ('Phát triển Nguồn Nhân lực', 'Tuyển dụng', 'Miền Bắc', 'Rank 6', '6A', 'NV', 1, 'QL');
+  c := c + 1;  -- khối văn phòng: chọn tự do
+  begin
+    update public.seat_requests set vung = 'Miền Bắc' where id = s2;  -- s2 đang ở Kho Cần Thơ
+    assert false, 'đổi vùng sai Đội phải bị chặn';
+  exception when others then assert sqlerrm = 'SEAT_VUNG_LOCKED', 'đổi vùng: ' || sqlerrm; c := c + 1;
+  end;
+  -- ---------- 0043: Ranking theo Vị trí ----------
+  insert into public.seat_requests (ban, vung, nhom_chuc_danh, ranking_ap, vi_tri_ap, so_luong, quan_ly_truc_tiep)
+  values ('Pháp chế', 'Miền Nam', 'Rank 6', '6B', 'Nhân viên Lái xe nâng', 1, 'QL') returning id into s3;
+  c := c + 1;  -- vị trí thật, 1 trong 2 ranking của vị trí
+  begin
+    insert into public.seat_requests (ban, vung, nhom_chuc_danh, ranking_ap, vi_tri_ap, so_luong, quan_ly_truc_tiep)
+    values ('Pháp chế', 'Miền Nam', 'Rank 5', '5A', 'Nhân viên Lái xe nâng', 1, 'QL');
+    assert false, 'ranking ngoài vị trí phải bị chặn';
+  exception when others then assert sqlerrm = 'SEAT_POS_RANKING', 'ranking sai: ' || sqlerrm; c := c + 1;
+  end;
+  begin
+    insert into public.seat_requests (ban, vung, nhom_chuc_danh, ranking_ap, vi_tri_ap, so_luong, quan_ly_truc_tiep)
+    values ('Pháp chế', 'Miền Nam', 'Rank 6', '6A', 'Vị trí chưa có', 1, 'QL');
+    assert false, 'vị trí ngoài danh mục phải bị chặn';
+  exception when others then assert sqlerrm = 'SEAT_POS_UNKNOWN', 'vị trí sai: ' || sqlerrm; c := c + 1;
+  end;
+  begin
+    update public.seat_requests set ranking_ap = '4C' where id = s3;
+    assert false, 'đổi ranking sai vị trí phải bị chặn';
+  exception when others then assert sqlerrm = 'SEAT_POS_RANKING', 'đổi ranking: ' || sqlerrm; c := c + 1;
+  end;
+  update public.seat_requests set ranking_ap = '6A' where id = s3;
+  c := c + 1;  -- đổi sang ranking khác của cùng vị trí
+  begin
+    insert into public.seat_positions (vi_tri, ranking) values ('TA không được thêm', '6A');
+    assert false, 'TA không được sửa danh mục vị trí';
+  exception when others then assert sqlstate = '42501', 'TA sửa vị trí: ' || sqlstate; c := c + 1;
+  end;
   begin
     insert into public.seat_org_paths (ban) values ('TA không được thêm');
     assert false, 'TA không được sửa danh mục';
@@ -215,7 +275,38 @@ begin
   delete from public.seat_org_paths where ban = 'Ban thử admin 2';
   get diagnostics n = row_count;
   assert n = 2, 'admin xóa 2 nhánh, xóa ' || n; c := c + 1;
+  insert into public.seat_positions (vi_tri, ranking) values ('Vị trí admin thêm', '4A');
+  update public.seat_positions set active = false where vi_tri = 'Vị trí admin thêm';
+  get diagnostics n = row_count;
+  assert n = 1, 'admin tắt vị trí'; c := c + 1;
+  begin
+    insert into public.seat_positions (vi_tri, ranking) values ('Vị trí admin thêm', '7A');
+    assert false, 'ranking ngoài 2A–6C phải bị chặn';
+  exception when others then assert sqlstate = '23514', 'ranking sai dạng: ' || sqlstate; c := c + 1;
+  end;
+  perform set_config('request.jwt.claim.sub', t1::text, true);
+  begin
+    insert into public.seat_requests (ban, vung, nhom_chuc_danh, ranking_ap, vi_tri_ap, so_luong, quan_ly_truc_tiep)
+    values ('Pháp chế', 'Miền Nam', 'Rank 4', '4A', 'Vị trí admin thêm', 1, 'QL');
+    assert false, 'vị trí đã tắt phải bị chặn';
+  exception when others then assert sqlerrm = 'SEAT_POS_UNKNOWN', 'vị trí tắt: ' || sqlerrm; c := c + 1;
+  end;
+  perform set_config('request.jwt.claim.sub', a::text, true);
+  delete from public.seat_positions where vi_tri = 'Vị trí admin thêm';
+  get diagnostics n = row_count;
+  assert n = 1, 'admin xóa vị trí, xóa ' || n; c := c + 1;
+  select count(*) into n from public.seat_positions where vi_tri not in ('NV', 'Nhân viên kho', 'Trưởng ca', 'Lái xe nâng');
+  assert n = 64, '0043: 64 cặp vị trí – ranking, được ' || n; c := c + 1;
   execute 'reset role';
+  select count(distinct doi) into n from public.seat_org_paths where vung <> '';
+  assert n = 28, '0042: 28 Đội có vùng, được ' || n; c := c + 1;
+  assert app.seat_vung_required('Chuỗi Cung Ứng', 'Cool Chain Logistics', 'Kho Cool Chain', '', '') is null, 'Cool Chain nhiều vùng'; c := c + 1;
+  assert app.seat_vung_required('Chuỗi Cung Ứng', 'Ambient Logistics', 'Kho Ambient', 'Kho Vinh - Nghệ An', 'Inbound') = 'Miền Trung', 'Kho Vinh'; c := c + 1;
+  begin
+    insert into public.seat_org_paths (ban, vung) values ('Ban thử vùng', 'Miền Tây');
+    assert false, 'vùng ngoài 3 miền phải bị chặn';
+  exception when others then assert sqlstate = '23514', 'vùng nhánh: ' || sqlstate; c := c + 1;
+  end;
   assert app.seat_org_error('Chuỗi Cung Ứng', 'Ambient Logistics', 'Kho Ambient', '', 'Inbound') = 'SEAT_ORG_HOLE:doi', 'hole doi'; c := c + 1;
   assert app.seat_org_error(' Chuỗi Cung Ứng ', '', '', '', '') is null, 'cắt khoảng trắng'; c := c + 1;
 

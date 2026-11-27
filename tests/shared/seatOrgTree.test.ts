@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   SEAT_ORG_MSG_BAN_REQUIRED, SEAT_ORG_MSG_DUP, SEAT_ORG_MSG_HOLE, SEAT_ORG_MSG_INVALID, parseSeatOrgDbError, seatOrgClean,
-  seatOrgError, seatOrgOptions, seatOrgPathError, seatOrgRenamePlan, seatOrgSet, type SeatOrgPath,
+  SEAT_VUNG_MSG_INVALID, SEAT_VUNG_MSG_LOCKED, parseSeatVungDbError, seatOrgError, seatOrgOptions, seatOrgPathError,
+  seatOrgRenamePlan, seatOrgSet, seatVungError, seatVungRequired, type SeatOrgPath,
 } from '../../shared/seatOrgTree.ts';
 
 const P = (ban: string, don_vi = '', phong = '', doi = '', to_nhom = ''): SeatOrgPath => ({ ban, don_vi, phong, doi, to_nhom });
@@ -94,6 +95,46 @@ describe('admin sửa cây (seatOrgPathError, seatOrgRenamePlan)', () => {
     expect(seatOrgRenamePlan(rows, 'don_vi', rows[0], 'AL')).toEqual({ changed: 3, conflicts: 0 });
     expect(seatOrgRenamePlan(rows, 'doi', rows[0], 'Kho Cần Thơ')).toEqual({ changed: 2, conflicts: 1 });
     expect(seatOrgRenamePlan(rows, 'ban', rows[0], 'CCU')).toEqual({ changed: 4, conflicts: 0 });
+  });
+});
+
+describe('Vùng khóa theo Đội (0042)', () => {
+  const V = (vung: string, ban: string, don_vi = '', phong = '', doi = '', to_nhom = ''): SeatOrgPath => ({ ...P(ban, don_vi, phong, doi, to_nhom), vung });
+  const vp = [
+    V('Miền Bắc', 'Chuỗi Cung Ứng', 'Ambient Logistics', 'Kho Ambient', 'Kho Bắc Ninh', 'Inbound'),
+    V('Miền Bắc', 'Chuỗi Cung Ứng', 'Ambient Logistics', 'Kho Ambient', 'Kho Bắc Ninh', 'Pick Pack'),
+    V('Miền Nam', 'Chuỗi Cung Ứng', 'Ambient Logistics', 'Kho Ambient', 'Kho Cần Thơ', 'Inbound'),
+    V('', 'Chuỗi Cung Ứng', 'Ambient Logistics', 'Kho Ambient', 'Kho Suối Mơ'),
+    V('', 'Phát triển Nguồn Nhân lực', 'Tuyển dụng'),
+  ];
+  it('Đội một vùng -> khóa; nhiều vùng / chưa điền / văn phòng -> tự do', () => {
+    expect(seatVungRequired(vp, { ban: 'Chuỗi Cung Ứng', don_vi: 'Ambient Logistics', phong: 'Kho Ambient', doi: 'Kho Bắc Ninh' })).toBe('Miền Bắc');
+    expect(seatVungRequired(vp, { ban: 'Chuỗi Cung Ứng', don_vi: 'Ambient Logistics', phong: 'Kho Ambient', doi: 'Kho Cần Thơ', to_nhom: 'Inbound' })).toBe('Miền Nam');
+    expect(seatVungRequired(vp, { ban: 'Chuỗi Cung Ứng', don_vi: 'Ambient Logistics' })).toBeNull();
+    expect(seatVungRequired(vp, { ban: 'Chuỗi Cung Ứng', don_vi: 'Ambient Logistics', phong: 'Kho Ambient', doi: 'Kho Suối Mơ' })).toBeNull();
+    expect(seatVungRequired(vp, { ban: 'Phát triển Nguồn Nhân lực', don_vi: 'Tuyển dụng' })).toBeNull();
+    expect(seatVungRequired(vp, {})).toBeNull();
+  });
+  it('lỗi vùng giống app.seat_vung_error', () => {
+    const doi = { ban: 'Chuỗi Cung Ứng', don_vi: 'Ambient Logistics', phong: 'Kho Ambient', doi: 'Kho Bắc Ninh' };
+    expect(seatVungError(vp, { ...doi, vung: 'Miền Nam' })).toEqual({ key: 'vung', msg: SEAT_VUNG_MSG_LOCKED });
+    expect(seatVungError(vp, { ...doi, vung: ' Miền Bắc ' })).toBeNull();
+    expect(parseSeatVungDbError('SEAT_VUNG_LOCKED')).toEqual({ key: 'vung', msg: SEAT_VUNG_MSG_LOCKED });
+    expect(parseSeatVungDbError('SEAT_ORG_HOLE:doi')).toBeNull();
+  });
+  it('admin chỉ điền được 3 miền hoặc để trống', () => {
+    expect(seatOrgPathError({ ban: 'A', vung: 'Miền Tây' })).toEqual({ key: 'vung', msg: SEAT_VUNG_MSG_INVALID });
+    expect(seatOrgPathError({ ban: 'A', vung: 'Miền Trung' })).toBeNull();
+  });
+  it('bảng Đội -> vùng của 0042 khớp tên Đội trong 0041', () => {
+    const read = (f: string) => readFileSync(fileURLToPath(new URL(`../../supabase/migrations/${f}`, import.meta.url)), 'utf8');
+    const doiIn41 = new Set([...read('0041_seat_org_tree.sql').matchAll(/^ {2}\('(?:[^']|'')*', '(?:[^']|'')*', '(?:[^']|'')*', '((?:[^']|'')*)'/gm)].map((m) => m[1]));
+    const sql42 = read('0042_seat_org_vung.sql');
+    const map = [...sql42.matchAll(/\('([^']+)', '(Miền (?:Bắc|Nam|Trung))'\)/g)].map((m) => m[1]);
+    expect(map.length).toBe(28);
+    expect(new Set(map).size).toBe(28);
+    expect(map.filter((d) => !doiIn41.has(d))).toEqual([]);
+    expect(sql42).toContain("'SEAT_VUNG_LOCKED'");
   });
 });
 
