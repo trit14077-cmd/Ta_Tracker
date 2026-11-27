@@ -64,6 +64,12 @@ describe('hàm chuẩn hóa đơn lẻ', () => {
     expect(normalizeBirth('1999')).toEqual({ value: '1999' });
     expect(normalizeBirth('31/02/1999').error).toBeTruthy();
     expect(normalizeBirth('2020').error).toBeTruthy();
+    // task #7: TA nhập năm hiện tại / tương lai -> báo lỗi (chặn lưu)
+    const nov2026 = new Date(2026, 10, 27);
+    expect(normalizeBirth('2026', nov2026).error).toMatch(/1946 đến 2012/);
+    expect(normalizeBirth('15/08/2026', nov2026).error).toBeTruthy();
+    expect(normalizeBirth('2030', nov2026).error).toBeTruthy();
+    expect(normalizeBirth('2012', nov2026)).toEqual({ value: '2012' });
   });
   it('link CV: tự thêm https://, chuỗi không phải link bị từ chối (run.mjs:337,338)', () => {
     expect(normalizeCvLink('linkedin.com/in/abc')).toEqual({ value: 'https://linkedin.com/in/abc' });

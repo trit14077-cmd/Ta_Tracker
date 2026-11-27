@@ -399,6 +399,13 @@ export const CandidateFormView: React.FC<CandidateFormViewProps> = ({
       }),
     [validationValues, dropdowns, editingCandidate, isEditMode]
   );
+  // Năm sinh / ô ngày: nhập sai thì báo ngay khi rời ô (task #7), không đợi tới lúc bấm Lưu / Mục tiếp theo.
+  const handleFormatBlur = (key: string) => {
+    if (!String(values[key] ?? '').trim()) return;
+    const err = liveValidation.errors[key];
+    if (err) setFieldErrors((prev) => ({ ...prev, [key]: err }));
+  };
+
   const stepErrorKeys = (sectionId: number): string[] =>
     FIELD_CATALOG.filter((f) => f.sectionId === sectionId && liveValidation.errors[f.key]).map((f) => f.key);
   const stepComplete = (sectionId: number): boolean => stepErrorKeys(sectionId).length === 0;
@@ -1205,7 +1212,15 @@ export const CandidateFormView: React.FC<CandidateFormViewProps> = ({
                           value={displayValue}
                           disabled={disabled}
                           onChange={(e) => updateField(field.key, e.target.value)}
-                          onBlur={field.key === 'phone' ? handlePhoneBlur : field.key === 'email' ? handleEmailBlur : undefined}
+                          onBlur={
+                            field.key === 'phone'
+                              ? handlePhoneBlur
+                              : field.key === 'email'
+                              ? handleEmailBlur
+                              : field.key === 'birth' || field.type === 'date'
+                              ? () => handleFormatBlur(field.key)
+                              : undefined
+                          }
                           placeholder={
                             field.key === 'birth'
                               ? 'DD/MM/YYYY hoặc YYYY (VD: 15/08/1999 hoặc 1999)'
