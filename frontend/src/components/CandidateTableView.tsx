@@ -40,6 +40,7 @@ import { CandidateFormView } from './CandidateFormView.tsx';
 import { CandidateDetailModal } from './CandidateDetailModal.tsx';
 import { CommentsPanel } from './CommentsPanel.tsx';
 import { requiredDocuments } from '../../../shared/documentRules.ts';
+import { DatePickButton } from './DatePickButton.tsx';
 
 interface CandidateTableViewProps {
   user: UserProfile;
@@ -696,16 +697,19 @@ export const CandidateTableView: React.FC<CandidateTableViewProps> = ({
               <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                 Từ ngày (DD/MM/YYYY)
               </label>
-              <input
-                type="text"
-                value={filters.date_from_display}
-                onChange={(e) => {
-                  setFilters((f) => ({ ...f, date_from_display: e.target.value }));
-                  setPage(1);
-                }}
-                placeholder="01/11/2026"
-                className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded bg-white font-mono-tabular"
-              />
+              <div className="relative w-full">
+                <input
+                  type="text"
+                  value={filters.date_from_display}
+                  onChange={(e) => {
+                    setFilters((f) => ({ ...f, date_from_display: e.target.value }));
+                    setPage(1);
+                  }}
+                  placeholder="01/11/2026"
+                  className="w-full pl-2.5 pr-9 py-1.5 text-xs border border-slate-300 rounded bg-white font-mono-tabular"
+                />
+                <DatePickButton value={filters.date_from_display} onPick={(d) => { setFilters((f) => ({ ...f, date_from_display: d })); setPage(1); }} />
+              </div>
             </div>
 
             <div>
@@ -713,16 +717,19 @@ export const CandidateTableView: React.FC<CandidateTableViewProps> = ({
                 Đến ngày (DD/MM/YYYY)
               </label>
               <div className="flex items-center gap-1.5">
-                <input
-                  type="text"
-                  value={filters.date_to_display}
-                  onChange={(e) => {
-                    setFilters((f) => ({ ...f, date_to_display: e.target.value }));
-                    setPage(1);
-                  }}
-                  placeholder="30/11/2026"
-                  className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded bg-white font-mono-tabular"
-                />
+                <div className="relative w-full">
+                  <input
+                    type="text"
+                    value={filters.date_to_display}
+                    onChange={(e) => {
+                      setFilters((f) => ({ ...f, date_to_display: e.target.value }));
+                      setPage(1);
+                    }}
+                    placeholder="30/11/2026"
+                    className="w-full pl-2.5 pr-9 py-1.5 text-xs border border-slate-300 rounded bg-white font-mono-tabular"
+                  />
+                  <DatePickButton value={filters.date_to_display} onPick={(d) => { setFilters((f) => ({ ...f, date_to_display: d })); setPage(1); }} />
+                </div>
                 <button
                   type="button"
                   title="Xóa toàn bộ bộ lọc"
