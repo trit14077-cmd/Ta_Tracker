@@ -165,6 +165,10 @@ jobs:
         run: |
           psql -v ON_ERROR_STOP=1 -f supabase/tests/cnb_test.sql 2>&1 | tee cnb.log
           grep -q "CNB_TEST_PASSED" cnb.log
+      - name: Bonus hàng tháng (0045+) – RLS, chốt / mở lại, chống trả hai lần (tự rollback)
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/bonus_test.sql 2>&1 | tee bonus.log
+          grep -q "BONUS_TEST_PASSED" bonus.log
       - name: 20 phiên đồng thời tạo mã cùng PIC không trùng
         run: bash supabase/tests/concurrency_codes.sh
 

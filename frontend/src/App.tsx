@@ -6,7 +6,7 @@ import { LangSwitch } from './i18n.tsx';
 import {
   Users, FileSpreadsheet, BarChart3, ListFilter, History, ShieldCheck, LogOut, KeyRound, AlertTriangle,
   ClipboardCheck, ChevronsLeft, ChevronsRight, ListTodo, CalendarDays, Target, Construction, Table2, SquareKanban, Search, Inbox,
-  Armchair, ClipboardList,
+  Armchair, ClipboardList, Gift,
 } from 'lucide-react';
 import logoUrl from './assets/the-supra-logo.png';
 import { authService, canEditPic, type UserProfile } from './services/authService.ts';
@@ -31,10 +31,11 @@ import { ImportExcelView } from './components/ImportExcelView.tsx';
 import { ApplicationsInbox } from './components/ApplicationsInbox.tsx';
 import { SeatRequestsView } from './components/SeatRequestsView.tsx';
 import { CnbObView } from './components/CnbObView.tsx';
+import { BonusView } from './components/BonusView.tsx';
 import { applicationsService } from './services/applicationsService.ts';
 import { candidateService, type CandidateRecord, type DropdownDataResponse } from './services/candidateService.ts';
 
-type NavTab = 'candidates' | 'tasks' | 'calendar' | 'targets' | 'import_excel' | 'reports' | 'follow_wd' | 'droplist' | 'audit' | 'users' | 'seat_codes' | 'cnb_ob';
+type NavTab = 'candidates' | 'tasks' | 'calendar' | 'targets' | 'import_excel' | 'reports' | 'follow_wd' | 'droplist' | 'audit' | 'users' | 'seat_codes' | 'cnb_ob' | 'bonus';
 
 const SIDEBAR_MIN = 68; // icons only
 const SIDEBAR_DEFAULT = 240;
@@ -54,9 +55,10 @@ const TITLES: Record<NavTab, string> = {
   users: 'Quản trị Tài khoản Người dùng',
   seat_codes: 'Mã ghế (tạo và cấp mã)',
   cnb_ob: 'Chốt OB / CnB (chốt danh sách ngày 25, kiểm hồ sơ)',
+  bonus: 'Bonus hàng tháng (Referral, Sign-on, TA)',
 };
 // Màn hình đã chuyển sang hệ mới. Các mục khác hiện mờ cho tới khi chuyển xong (IMPLEMENTATION_TASKS M4–M7).
-const READY: NavTab[] = ['users', 'candidates', 'tasks', 'calendar', 'targets', 'reports', 'follow_wd', 'audit', 'droplist', 'import_excel', 'seat_codes', 'cnb_ob'];
+const READY: NavTab[] = ['users', 'candidates', 'tasks', 'calendar', 'targets', 'reports', 'follow_wd', 'audit', 'droplist', 'import_excel', 'seat_codes', 'cnb_ob', 'bonus'];
 
 export default function App() {
   const [sidebarW, setSidebarW] = useState<number>(() => {
@@ -350,6 +352,7 @@ export default function App() {
     { id: 'follow_wd', label: 'Follow WD', icon: ClipboardCheck },
     { id: 'seat_codes', label: 'Mã ghế', icon: Armchair },
     { id: 'cnb_ob', label: 'Chốt OB / CnB', icon: ClipboardList },
+    { id: 'bonus', label: 'Bonus', icon: Gift },
     { id: 'droplist', label: 'Drop-list', icon: ListFilter, adminOnly: true },
     { id: 'audit', label: 'Nhật ký', icon: History },
     { id: 'users', label: 'Tài khoản', icon: ShieldCheck, adminOnly: true },
@@ -587,6 +590,8 @@ export default function App() {
             <SeatRequestsView user={user} />
           ) : activeTab === 'cnb_ob' ? (
             <CnbObView user={user} onOpenCandidate={openCandidateById} />
+          ) : activeTab === 'bonus' ? (
+            <BonusView user={user} onOpenCandidate={openCandidateById} />
           ) : (
             <div className="bg-white border border-slate-200 rounded-lg p-8 text-center text-xs text-slate-600 space-y-2">
               <Construction className="w-8 h-8 text-slate-400 mx-auto" />
