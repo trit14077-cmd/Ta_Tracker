@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Edit3, Archive, RotateCcw, FileText, Download } from 'lucide-react';
+import { X, Edit3, Archive, RotateCcw, FileText, Download, Mail } from 'lucide-react';
 import { FIELD_CATALOG, SECTIONS, isFieldApplicable } from '../../../shared/fieldCatalog.ts';
 import { StageBadge } from './StageBadge.tsx';
 import { dupText } from '../../../shared/dup.ts';
@@ -9,6 +9,7 @@ import type { UserProfile } from '../services/authService.ts';
 import { CommentsPanel } from './CommentsPanel.tsx';
 import { StatusChip } from './StatusChip.tsx';
 import { CvBuilderModal } from './CvBuilderModal.tsx';
+import { EmailComposerModal } from './EmailComposerModal.tsx';
 import { HrInfoBanner } from './HrInfoBanner.tsx';
 import { CandidateOpsPanel } from './CandidateOpsPanel.tsx';
 import { TranslationPanel } from './TranslationPanel.tsx';
@@ -41,6 +42,7 @@ export const CandidateDetailModal: React.FC<Props> = ({
 }) => {
   const archived = Boolean(candidate.is_archived);
   const [showCv, setShowCv] = useState(false);
+  const [showMail, setShowMail] = useState(false);
   const needDocs = requiredDocuments(String(candidate.position || ''), String(candidate.rank || ''));
   const missingDocs = needDocs.filter((k) => !String(candidate[k] || ''));
   const shownDocs = visibleDocumentKeys(String(candidate.position || ''));
@@ -121,6 +123,13 @@ export const CandidateDetailModal: React.FC<Props> = ({
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-white border border-blue-200 rounded-md hover:bg-blue-50"
             >
               <FileText className="w-3.5 h-3.5" /> Tạo CV
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowMail(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-white border border-blue-200 rounded-md hover:bg-blue-50"
+            >
+              <Mail className="w-3.5 h-3.5" /> Soạn email
             </button>
             {canEdit && (
               <button
@@ -227,6 +236,7 @@ export const CandidateDetailModal: React.FC<Props> = ({
         </div>
       </div>
       {showCv && <CvBuilderModal candidate={candidate} onClose={() => setShowCv(false)} />}
+      {showMail && <EmailComposerModal candidate={candidate} onClose={() => setShowMail(false)} />}
     </div>
   );
 };

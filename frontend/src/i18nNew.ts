@@ -7,6 +7,19 @@ import { POSITION_EN } from '../../shared/positionCatalog.ts';
 
 export const NEW_EN: Record<string, string> = {
   'Chọn ngày trên lịch': 'Pick a date on the calendar',
+  // ---- Soạn email theo mẫu (EmailComposerModal)
+  'Cần gửi bây giờ': 'Send now',
+  'Chưa đến lúc / đã qua': 'Not yet / already passed',
+  'Chờ ngày OB': 'Waiting for OB date',
+  'Trước OB': 'Before OB',
+  'Luồng 1 – Rank 6': 'Flow 1 – Rank 6',
+  'Luồng 2 – Rank 5 trở lên': 'Flow 2 – Rank 5 and above',
+  'Giờ nhận việc': 'Start time',
+  'Email công ty của nhân sự mới': "New hire's company email",
+  '(trống)': '(empty)',
+  '(chưa có)': '(not set)',
+  'Chữ ký người gửi (lưu trên máy này)': 'Sender signature (saved on this device)',
+  'Chức danh': 'Job title',
   // ---- sao lưu Supabase -> Google Sheet (Edge sheet-backup)
   'Không có quyền sao lưu.': 'You do not have permission to run the backup.',
   'Chưa cấu hình tài khoản Google hoặc GOOGLE_BACKUP_SHEET_ID.': 'The Google account or GOOGLE_BACKUP_SHEET_ID is not configured.',
