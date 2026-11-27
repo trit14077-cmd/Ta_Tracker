@@ -3,11 +3,18 @@
 
 /** = downloadXlsx của hệ cũ. */
 export async function downloadXlsx(filename: string, rows: (string | number)[][], sheetName: string, widths?: number[]): Promise<void> {
+  await downloadXlsxBook(filename, [{ name: sheetName, rows, widths }]);
+}
+
+/** Nhiều sheet trong một file (bonus: danh sách + Summary + MoM). Tên sheet tối đa 31 ký tự (giới hạn Excel). */
+export async function downloadXlsxBook(filename: string, sheets: { name: string; rows: (string | number)[][]; widths?: number[] }[]): Promise<void> {
   const XLSX = await import('xlsx');
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  if (widths) ws['!cols'] = widths.map((wch) => ({ wch }));
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  for (const s of sheets) {
+    const ws = XLSX.utils.aoa_to_sheet(s.rows);
+    if (s.widths) ws['!cols'] = s.widths.map((wch) => ({ wch }));
+    XLSX.utils.book_append_sheet(wb, ws, s.name.slice(0, 31));
+  }
   const out = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
   const url = URL.createObjectURL(new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
   const a = document.createElement('a');
