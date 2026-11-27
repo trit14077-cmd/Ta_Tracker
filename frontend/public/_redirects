@@ -1,0 +1,3 @@
+# Form ứng tuyển công khai: /apply và /apply/* trả về apply.html (giữ nguyên URL)
+/apply        /apply.html   200
+/apply/*      /apply.html   200

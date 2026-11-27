@@ -157,6 +157,14 @@ jobs:
         run: |
           psql -v ON_ERROR_STOP=1 -f supabase/tests/audit_purge_test.sql 2>&1 | tee purge.log
           grep -q "AUDIT_PURGE_TEST_PASSED" purge.log
+      - name: Mã ghế (0038, 0039) – RLS theo TA, luồng trạng thái, cấp mã liên tiếp, nhật ký (tự rollback)
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/seat_test.sql 2>&1 | tee seat.log
+          grep -q "SEAT_TEST_PASSED" seat.log
+      - name: Chốt OB CnB (0040) – kỳ 25→24, điều kiện, chốt / mở lại / bổ sung / kiểm hồ sơ (tự rollback)
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/cnb_test.sql 2>&1 | tee cnb.log
+          grep -q "CNB_TEST_PASSED" cnb.log
       - name: 20 phiên đồng thời tạo mã cùng PIC không trùng
         run: bash supabase/tests/concurrency_codes.sh
 
