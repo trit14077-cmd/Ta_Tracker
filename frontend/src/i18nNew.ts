@@ -387,6 +387,13 @@ export const NEW_EN: Record<string, string> = {
   'TT nhân sự': 'HR info',
   'Không có dòng phù hợp.': 'No matching rows.',
   'Chưa chọn': 'Not selected',
+  // Mã ghế – dropdown phụ thuộc Ban → Đơn vị → Phòng → Đội → Tổ (0041)
+  '— Không có —': '— None —',
+  '— Để trống —': '— Leave blank —',
+  'không có trong danh mục': 'not in the catalog',
+  'Không có trong danh mục của cấp trên đã chọn.': 'Not in the catalog under the selected parent level.',
+  'Chọn cấp này trước khi chọn các cấp sau.': 'Select this level before the levels below it.',
+  'Không tải được danh mục Ban/Đơn vị/Phòng/Đội/Tổ.': 'Could not load the Division/Unit/Department/Team/Group catalog.',
   'Đã chốt': 'Closed',
   'Ngày tuyển dụng': 'Hire date',
   'Giấy tờ (TA)': 'Documents (TA)',

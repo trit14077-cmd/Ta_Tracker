@@ -2,6 +2,7 @@
 // Kiểm dữ liệu bằng chính shared/seatCodeRules (cùng quy tắc với DB). Xuất file đúng cột tab NhapLieu.
 import { supabase } from '../lib/supabase.ts';
 import { downloadXlsx } from './xlsxDownload.ts';
+import { parseSeatOrgDbError, seatOrgError, type SeatOrgPath } from '../../../shared/seatOrgTree.ts';
 import {
   SEAT_EXPORT_HEADERS,
   toSeatExportRow,
@@ -54,6 +55,8 @@ const SEAT_ERRORS: [string, string][] = [
 
 function seatError(e: { message?: string; code?: string } | null, fallback: string): Error {
   const msg = e?.message ?? '';
+  const org = parseSeatOrgDbError(msg);  // 0041: Ban → Đơn vị → Phòng → Đội → Tổ sai nhánh
+  if (org) return new SeatValidationError({ [org.key]: org.msg });
   const hit = SEAT_ERRORS.find(([code]) => msg.includes(code));
   if (hit) return new Error(hit[1]);
   if (e?.code === '42501') return new Error('Bạn không có quyền thực hiện thao tác này.');
@@ -72,8 +75,18 @@ export const seatService = {
   },
 
   /** Tạo mới (id = null) hoặc sửa. Dòng đã gửi/đã cấp: RLS và trigger chặn, báo lỗi rõ ràng. */
-  async save(id: number | null, input: Record<string, unknown>): Promise<void> {
+  /** Danh mục Ban → Đơn vị → Phòng → Đội → Tổ đang dùng (bảng seat_org_paths, migration 0041). */
+  async orgPaths(): Promise<SeatOrgPath[]> {
+    const { data, error } = await supabase.from('seat_org_paths').select('ban, don_vi, phong, doi, to_nhom').eq('active', true).limit(5000);
+    if (error) throw seatError(error, 'Không tải được danh mục Ban/Đơn vị/Phòng/Đội/Tổ.');
+    return (data ?? []) as SeatOrgPath[];
+  },
+
+  /** paths: danh mục đã tải -> kiểm nhánh ngay trên trình duyệt (DB vẫn kiểm lại). */
+  async save(id: number | null, input: Record<string, unknown>, paths?: readonly SeatOrgPath[]): Promise<void> {
     const v = validateSeatRequest(input as Partial<Record<SeatInputKey, unknown>>);
+    const org = paths?.length ? seatOrgError(paths, v.clean) : null;
+    if (org && !v.errors[org.key]) v.errors[org.key] = org.msg;
     if (Object.keys(v.errors).length) throw new SeatValidationError(v.errors);
     const row = { ...v.clean, so_luong: Number(v.clean.so_luong) };
     if (id === null) {

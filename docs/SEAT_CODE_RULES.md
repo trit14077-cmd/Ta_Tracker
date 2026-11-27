@@ -51,6 +51,25 @@ Chuẩn hoá và cảnh báo (`shared/seatCodeRules.ts`):
 - Chữ số của Ranking AP phải khớp "Rank N". Mẫu có 1 dòng lệch (Rank 4 với 3C): đây là **cảnh báo**, không chặn.
 - Ngày sheet dd/mm/yyyy; ngày không tồn tại (31/02) bị từ chối.
 
+### Dropdown phụ thuộc Ban → Đơn vị → Phòng → Đội → Tổ (migration 0041, `shared/seatOrgTree.ts`)
+
+Sheet không dùng `INDIRECT`: mỗi ô của tab NhapLieu có danh sách riêng, lọc theo các ô bên trái. Nguồn là tab **RawData** (cây tổ chức, 107 nhánh, file `Request_Job Requisition.xlsx` ngày 27/11/2026).
+
+| Cấp | Cột sheet | Số giá trị | Lọc theo |
+|---|---|---|---|
+| 1 | C. Ban/ Chuỗi/ Khối | 9 | |
+| 2 | D. Các đơn vị thành viên | 19 | Ban |
+| 3 | E. Phòng/ Bộ Phận/ Nhóm | 12 | Ban + Đơn vị |
+| 4 | F. Đội | 30 | Ban + Đơn vị + Phòng |
+| 5 | G. Tổ (PP/IB/OB/IN/GV) | 6 | cả nhánh trên |
+
+- Quy tắc: 5 cột phải là **tiền tố** của một nhánh đang dùng. Được dừng ở giữa (31/166 dòng mẫu dừng ở giữa). Không được bỏ trống cấp giữa rồi điền cấp sau (1 dòng mẫu lỗi kiểu này).
+- Đối chiếu 166 dòng NhapLieu: 134 đúng nhánh đầy đủ, 31 dừng ở giữa, 1 lỗi.
+- Danh mục ở bảng `seat_org_paths`. Admin thêm nhánh hoặc tắt (`active = false`) trên Supabase Table Editor; TA chỉ đọc.
+- DB kiểm khi tạo dòng hoặc khi đổi 1 trong 5 cột (trigger `seat_requests_org_check`, lỗi `SEAT_ORG_INVALID:<cấp>` / `SEAT_ORG_HOLE:<cấp>`). Dòng cũ không bị khóa nếu danh mục đổi sau.
+- Form: đổi một cấp thì các cấp dưới tự xóa. Giá trị cũ không còn trong danh mục vẫn hiện, kèm chữ "(không có trong danh mục)".
+- Các cột từ Vùng trở đi không phụ thuộc cây (RawData để trống), giữ danh sách phẳng như cũ.
+
 ## 3. Cấp mã ghế
 
 Quan sát từ sheet:

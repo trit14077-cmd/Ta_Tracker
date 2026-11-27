@@ -1,5 +1,5 @@
 // Quy trình 1 – Mã ghế. TA nhập dòng ở tài khoản riêng, gửi HRBP; HRSS (admin) xác nhận, cấp mã và xuất file.
-// Quy tắc: shared/seatCodeRules.ts (docs/SEAT_CODE_RULES.md). Dữ liệu: seatService (migration 0038).
+// Quy tắc: shared/seatCodeRules.ts, shared/seatOrgTree.ts (docs/SEAT_CODE_RULES.md). Dữ liệu: seatService (0038, 0041).
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { BarChart3, CheckCircle2, Download, Hash, Pencil, Plus, RotateCcw, Send, Trash2 } from 'lucide-react';
 import { seatService, SeatValidationError, type SeatRequest, type SeatSummaryRow } from '../services/seatService.ts';
@@ -12,10 +12,12 @@ import {
   SEAT_STATUS_LABEL,
   SEAT_STATUSES,
   formatSheetDate,
+  normText,
   validateSeatRequest,
   type SeatInputKey,
   type SeatStatus,
 } from '../../../shared/seatCodeRules.ts';
+import { SEAT_ORG_LEVELS, seatOrgOptions, seatOrgSet, type SeatOrgLevel, type SeatOrgPath } from '../../../shared/seatOrgTree.ts';
 
 const STATUS_CLS: Record<SeatStatus, string> = {
   nhap: 'bg-slate-100 text-slate-700',
@@ -101,7 +103,24 @@ const FIELDS: { key: SeatInputKey; label: string; required?: boolean; select?: r
   { key: 'note', label: 'Note', wide: true },
 ];
 
+const isOrgLevel = (k: SeatInputKey): k is SeatOrgLevel => (SEAT_ORG_LEVELS as readonly string[]).includes(k);
+
 const inputCls = 'w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-200';
+
+// Dropdown phụ thuộc: chỉ hiện giá trị thuộc nhánh của các cấp trên (như sheet NhapLieu).
+const OrgSelect: React.FC<{ level: SeatOrgLevel; paths: SeatOrgPath[]; values: FormValues; onChange: (v: string) => void }> = ({ level, paths, values, onChange }) => {
+  const options = seatOrgOptions(paths, level, values);
+  const cur = values[level];
+  const stale = Boolean(cur) && !options.includes(cur);
+  const disabled = !cur && options.length === 0;
+  return (
+    <select className={`${inputCls} disabled:bg-slate-50 disabled:text-slate-400`} value={cur} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
+      <option value="">{disabled ? '— Không có —' : level === 'ban' ? '— Chọn —' : '— Để trống —'}</option>
+      {stale && <option value={cur}>{cur} (không có trong danh mục)</option>}
+      {options.map((o) => <option key={o} value={o}>{o}</option>)}
+    </select>
+  );
+};
 
 const SeatForm: React.FC<{ initial: SeatRequest | null; onClose: () => void; onSaved: (msg: string) => void }> = ({ initial, onClose, onSaved }) => {
   const [values, setValues] = useState<FormValues>(() => {
@@ -114,8 +133,17 @@ const SeatForm: React.FC<{ initial: SeatRequest | null; onClose: () => void; onS
   const [formError, setFormError] = useState('');
   const [busy, setBusy] = useState(false);
   const warnings = useMemo(() => validateSeatRequest(values).warnings, [values]);
+  // 0041: danh mục Ban → Đơn vị → Phòng → Đội → Tổ. null = chưa tải / lỗi → nhập tay như cũ (DB vẫn kiểm).
+  const [orgPaths, setOrgPaths] = useState<SeatOrgPath[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    seatService.orgPaths().then((p) => { if (alive && p.length) setOrgPaths(p); }).catch(() => undefined);
+    return () => { alive = false; };
+  }, []);
 
-  const set = (k: SeatInputKey, v: string) => setValues((s) => ({ ...s, [k]: v }));
+  const set = (k: SeatInputKey, v: string) => setValues((s) => (isOrgLevel(k) ? seatOrgSet(s, k, v) : { ...s, [k]: v }));
+  // Như DB: chỉ kiểm nhánh khi thêm mới hoặc khi đổi 1 trong 5 cột (dòng cũ không bị khóa nếu danh mục đổi sau).
+  const orgChanged = !initial || SEAT_ORG_LEVELS.some((k) => normText(values[k]) !== normText(initial[k]));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,7 +151,7 @@ const SeatForm: React.FC<{ initial: SeatRequest | null; onClose: () => void; onS
     setFormError('');
     setErrors({});
     try {
-      await seatService.save(initial ? initial.id : null, values);
+      await seatService.save(initial ? initial.id : null, values, orgChanged ? orgPaths ?? undefined : undefined);
       onSaved(initial ? 'Đã lưu dòng mã ghế.' : 'Đã thêm dòng mã ghế (nháp). Gửi HRBP khi đã đủ.');
     } catch (err) {
       if (err instanceof SeatValidationError) {
@@ -148,7 +176,9 @@ const SeatForm: React.FC<{ initial: SeatRequest | null; onClose: () => void; onS
           {FIELDS.map((f) => (
             <label key={f.key} className={`block text-xs text-slate-700 ${f.wide ? 'md:col-span-2' : ''}`}>
               <span className="font-medium">{f.label}{f.required && <span className="text-red-600"> *</span>}</span>
-              {f.select ? (
+              {orgPaths && isOrgLevel(f.key) ? (
+                <OrgSelect level={f.key} paths={orgPaths} values={values} onChange={(v) => set(f.key, v)} />
+              ) : f.select ? (
                 <select className={inputCls} value={values[f.key]} onChange={(e) => set(f.key, e.target.value)}>
                   <option value="">{f.optionalSelect ? '— Không —' : '— Chọn —'}</option>
                   {f.select.map((o) => <option key={o} value={o}>{o}</option>)}
